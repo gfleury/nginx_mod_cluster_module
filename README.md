@@ -15,9 +15,30 @@ Status
 
 Still in development. Lot of hard coded and PoC code. 
 
+
+Usage
+=====
+
+    server {
+        listen       80;
+        server_name  localhost;
+        ManagerBalancerName balancer-name;
+        ServerAdvertise On;
+        AdvertiseFrequency 5;
+        AdvertiseSecurityKey seckey;
+        EnableMCPMReceive;
+
+        location /info {
+                ModManagerInfo;
+        }
+    }
+
+
 License
 =======
 
 Based on Nginx code copyrighted by Igor Sysoev, https://github.com/nginx/nginx.
+
 Based on Mod_cluster by jfclere, https://github.com/modcluster/mod_cluster.
+
 This software is distributed under the terms of the FSF Lesser Gnu Public License (see [lgpl.txt](lgpl.txt)).
