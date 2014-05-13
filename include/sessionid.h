@@ -50,9 +50,10 @@ typedef struct mem mem_t;
 struct sessionidinfo {
     char sessionid[SESSIONIDSZ]; /* Sessionid value */
     char JVMRoute[JVMROUTESZ];   /* corresponding node */
-
+    
     time_t updatetime;    /* time of last received message */
     int id;                      /* id in table */
+    ngx_int_t node_id;
 };
 typedef struct sessionidinfo sessionidinfo_t; 
 

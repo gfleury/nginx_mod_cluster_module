@@ -9,82 +9,13 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-typedef struct {
-    ngx_uint_t                          nreq;
-    ngx_uint_t                          total_req;
-    ngx_uint_t                          last_req_id;
-    ngx_uint_t                          fails;
-    ngx_uint_t                          current_weight;
-} ngx_http_upstream_fair_shared_t;
+#include "ngx_http_upstream_fair_module.h"
 
-typedef struct ngx_http_upstream_fair_peers_s ngx_http_upstream_fair_peers_t;
-
-typedef struct {
-    ngx_rbtree_node_t                   node;
-    ngx_uint_t                          generation;
-    uintptr_t                           peers;      /* forms a unique cookie together with generation */
-    ngx_uint_t                          total_nreq;
-    ngx_uint_t                          total_requests;
-    ngx_atomic_t                        lock;
-    ngx_http_upstream_fair_shared_t     stats[1];
-} ngx_http_upstream_fair_shm_block_t;
-
-/* ngx_spinlock is defined without a matching unlock primitive */
-#define ngx_spinlock_unlock(lock)       (void) ngx_atomic_cmp_set(lock, ngx_pid, 0)
-
-typedef struct {
-    ngx_http_upstream_fair_shared_t    *shared;
-    struct sockaddr                    *sockaddr;
-    socklen_t                           socklen;
-    ngx_str_t                           name;
-
-    ngx_uint_t                          weight;
-    ngx_uint_t                          max_fails;
-    time_t                              fail_timeout;
-
-    time_t                              accessed;
-    ngx_uint_t                          down:1;
-
-#if (NGX_HTTP_SSL)
-    ngx_ssl_session_t                  *ssl_session;    /* local to a process */
-#endif
-
-} ngx_http_upstream_fair_peer_t;
-
-#define NGX_HTTP_UPSTREAM_FAIR_NO_RR            (1<<26)
-#define NGX_HTTP_UPSTREAM_FAIR_WEIGHT_MODE_IDLE (1<<27)
-#define NGX_HTTP_UPSTREAM_FAIR_WEIGHT_MODE_PEAK (1<<28)
-#define NGX_HTTP_UPSTREAM_FAIR_WEIGHT_MODE_MASK ((1<<27) | (1<<28))
-
-enum { WM_DEFAULT = 0, WM_IDLE, WM_PEAK };
-
-struct ngx_http_upstream_fair_peers_s {
-    ngx_http_upstream_fair_shm_block_t *shared;
-    ngx_uint_t                          current;
-    ngx_uint_t                          size_err:1;
-    ngx_uint_t                          no_rr:1;
-    ngx_uint_t                          weight_mode:2;
-    ngx_uint_t                          number;
-    ngx_str_t                          *name;
-    ngx_http_upstream_fair_peers_t     *next;           /* for backup peers support, not really used yet */
-    ngx_http_upstream_fair_peer_t       peer[1];
-};
+ngx_module_t ngx_http_manager_module;
+const struct sessionid_storage_method *get_sessionid_storage();
+static const struct sessionid_storage_method *sessionid_storage = NULL;
 
 
-#define NGX_PEER_INVALID (~0UL)
-
-typedef struct {
-    ngx_http_upstream_fair_peers_t     *peers;
-    ngx_uint_t                          current;
-    uintptr_t                          *tried;
-    uintptr_t                          *done;
-    uintptr_t                           data;
-    uintptr_t                           data2;
-} ngx_http_upstream_fair_peer_data_t;
-
-
-static ngx_int_t ngx_http_upstream_init_fair(ngx_conf_t *cf,
-    ngx_http_upstream_srv_conf_t *us);
 static ngx_int_t ngx_http_upstream_get_fair_peer(ngx_peer_connection_t *pc,
     void *data);
 static void ngx_http_upstream_free_fair_peer(ngx_peer_connection_t *pc,
@@ -96,18 +27,6 @@ static char *ngx_http_upstream_fair(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_http_upstream_fair_set_shm_size(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_http_upstream_fair_init_module(ngx_cycle_t *cycle);
-
-#if (NGX_HTTP_EXTENDED_STATUS)
-static ngx_chain_t *ngx_http_upstream_fair_report_status(ngx_http_request_t *r,
-    ngx_int_t *length);
-#endif
-
-#if (NGX_HTTP_SSL)
-static ngx_int_t ngx_http_upstream_fair_set_session(ngx_peer_connection_t *pc,
-    void *data);
-static void ngx_http_upstream_fair_save_session(ngx_peer_connection_t *pc,
-    void *data);
-#endif
 
 static ngx_command_t  ngx_http_upstream_fair_commands[] = {
 
@@ -589,7 +508,7 @@ ngx_http_upstream_init_fair_rr(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     return NGX_OK;
 }
 
-static ngx_int_t
+ngx_int_t
 ngx_http_upstream_init_fair(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 {
     ngx_http_upstream_fair_peers_t     *peers;
@@ -849,6 +768,64 @@ ngx_http_upstream_choose_fair_peer_busy(ngx_peer_connection_t *pc,
     return best_idx;
 }
 
+static ngx_int_t ngx_http_upstream_get_sticky_peer(ngx_peer_connection_t *pc, ngx_http_upstream_fair_peer_data_t *fp) {
+    ngx_uint_t                          n, i;
+    ngx_uint_t                          npeers = fp->peers->number;
+    ngx_uint_t                          best_idx = NGX_PEER_INVALID;
+
+    ngx_uint_t                          size;
+    
+    sessionid_storage = get_sessionid_storage();
+    
+    size = sessionid_storage->get_max_size_sessionid();
+    if (size == 0)
+        return best_idx;
+    
+    int sessions[DEFMAXSESSIONID];
+    ngx_uint_t sizebalancer = sessionid_storage->get_ids_used_sessionid(sessions);
+    
+    if (sizebalancer == 0)
+        return best_idx;
+    
+    for (i = 0; i < sizebalancer; i++) {
+        sessionidinfo_t* si;
+        int sessions_index = sessions[i];
+        sessionid_storage->read_sessionid(sessions_index, &si);
+        if (fp->ctx->sticky_data && !ngx_memcmp(si->sessionid, fp->ctx->sticky_data, sizeof(si->sessionid))) {            
+            ngx_uint_t j;
+            ngx_log_error(NGX_LOG_DEBUG, pc->log, 0, "[upstream_fair] find sticky %s", si->sessionid);
+            
+            for (j = 0, n = fp->current; j < npeers; j++, n = (n + 1) % npeers) {
+                ngx_http_upstream_fair_peer_t *peer;
+                ngx_uint_t nreq;
+
+                peer = &fp->peers->peer[n];
+                nreq = fp->peers->peer[n].shared->nreq;
+                
+                if (!ngx_memcmp(peer->JVMRoute, si->JVMRoute, sizeof(si->JVMRoute))) { 
+                    ngx_log_error(NGX_LOG_DEBUG, pc->log, 0, "[upstream_fair] found sticky %s pointing to %s", si->sessionid, si->JVMRoute);
+                    best_idx = n;
+                    break;    
+                }
+            }
+            
+            
+        }
+    }
+    
+    if (ngx_http_upstream_fair_try_peer(pc, fp, n) != NGX_OK) {
+        if (!pc->tries) {
+            ngx_log_debug(NGX_LOG_DEBUG_HTTP, pc->log, 0, "[upstream_fair] all backends exhausted");
+            return NGX_PEER_INVALID;
+        }
+
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0, "[upstream_fair] backend %d already tried", n);
+    }
+
+
+    return best_idx;
+}
+
 static ngx_int_t
 ngx_http_upstream_choose_fair_peer(ngx_peer_connection_t *pc,
     ngx_http_upstream_fair_peer_data_t *fp, ngx_uint_t *peer_id)
@@ -865,7 +842,14 @@ ngx_http_upstream_choose_fair_peer(ngx_peer_connection_t *pc,
         *peer_id = 0;
         return NGX_OK;
     }
-
+    
+    /* SEARCH FOR STICKY SESSIONS */
+    best_idx = ngx_http_upstream_get_sticky_peer(pc, fp);
+    if (best_idx != NGX_PEER_INVALID) {
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0, "[upstream_fair] peer %i is sticky", best_idx);
+        goto chosen;
+    }
+    
     /* any idle backends? */
     best_idx = ngx_http_upstream_choose_fair_peer_idle(pc, fp);
     if (best_idx != NGX_PEER_INVALID) {
@@ -882,6 +866,19 @@ ngx_http_upstream_choose_fair_peer(ngx_peer_connection_t *pc,
     return NGX_BUSY;
 
 chosen:
+        
+    if (fp->ctx->sticky_data) {
+        ngx_http_upstream_fair_peer_t *peer = &fp->peers->peer[best_idx];
+        u_char *jvmroute = peer->JVMRoute;
+        
+        if (fp->ctx->sticky_data && jvmroute) {
+            sessionidinfo_t ou;
+            ngx_memcpy(ou.sessionid, fp->ctx->sticky_data, SESSIONIDSZ);
+            ngx_memcpy(ou.JVMRoute, jvmroute, JVMROUTESZ);
+            sessionid_storage->insert_update_sessionid(&ou);
+        }
+    }
+        
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0, "[upstream_fair] chose peer %i", best_idx);
     *peer_id = best_idx;
     ngx_bitvector_set(fp->tried, best_idx);
@@ -908,7 +905,7 @@ ngx_http_upstream_get_fair_peer(ngx_peer_connection_t *pc, void *data)
 
     peer_id = fp->current;
     fp->current = (fp->current + 1) % fp->peers->number;
-
+    
     lock = &fp->peers->shared->lock;
     ngx_spinlock(lock, ngx_pid, 1024);
     ret = ngx_http_upstream_choose_fair_peer(pc, fp, &peer_id);
@@ -1115,7 +1112,9 @@ ngx_http_upstream_init_fair_peer(ngx_http_request_t *r,
         if (fp == NULL) {
             return NGX_ERROR;
         }
-
+        
+        fp->ctx = ngx_http_get_module_ctx(r, ngx_http_manager_module);
+        
         r->upstream->peer.data = fp;
     }
 

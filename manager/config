@@ -1,3 +1,3 @@
 ngx_addon_name=ngx_http_manager_module
 HTTP_MODULES="$HTTP_MODULES ngx_http_manager_module"
-NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_manager_module.c $ngx_addon_dir/sharedmem_util.c $ngx_addon_dir/node.c $ngx_addon_dir/domain.c $ngx_addon_dir/host.c $ngx_addon_dir/balancer.c $ngx_addon_dir/context.c $ngx_addon_dir/jgroupsid.c $ngx_addon_dir/sessionid.c $ngx_addon_dir/ngx_http_proxy_manager_module.c"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_manager_module.c $ngx_addon_dir/sharedmem_util.c $ngx_addon_dir/node.c $ngx_addon_dir/domain.c $ngx_addon_dir/host.c $ngx_addon_dir/balancer.c $ngx_addon_dir/context.c $ngx_addon_dir/jgroupsid.c $ngx_addon_dir/sessionid.c $ngx_addon_dir/ngx_http_proxy_manager_module.c $ngx_addon_dir/ngx_http_upstream_fair_module.c"

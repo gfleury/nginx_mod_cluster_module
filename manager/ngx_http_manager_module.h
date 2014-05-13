@@ -235,4 +235,15 @@ struct node_context
 };
 typedef struct node_context node_context;
 
+typedef struct {
+    ngx_http_status_t              status;
+    ngx_http_chunked_t             chunked;
+    ngx_http_proxy_vars_t          vars;
+    off_t                          internal_body_length;
+
+    ngx_uint_t                     head;  /* unsigned  head:1 */
+    ngx_http_proxy_loc_conf_t  *plcf;
+    u_char                      sticky_data[SESSIONIDSZ];
+} ngx_http_proxy_ctx_t;
+
 #endif

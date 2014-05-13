@@ -12,6 +12,8 @@
 #include <ngx_http.h>
 
 #include "ngx_http_manager_module.h"
+#include "ngx_http_upstream_fair_module.h"
+
 #include "../include/ngx_utils.h"
 
 /* helper for the handling of the Alias: host1,... Context: context1,... */
@@ -201,7 +203,7 @@ static char *ngx_cmd_manager_mcpm_receive_enable(ngx_conf_t *cf, ngx_command_t *
     clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
     clcf->handler = ngx_http_manager_handler;
     
-        /*
+     /*
      * Configure proxy structures
      */    
     for (i = 0; i < DEFMAXHOST; i++) {
@@ -1555,7 +1557,7 @@ static u_char *process_config(ngx_http_request_t *r, u_char **uptr, int *errtype
         int balancerid = balancerinfo.id - 1;
         ngx_http_proxy_loc_conf_t  *plcf = mconf->plcf[balancerid]; 
         ngx_http_upstream_srv_conf_t *uscf = plcf->upstream.upstream;
-        ngx_http_upstream_rr_peers_t *peers = uscf->peer.data;
+        ngx_http_upstream_fair_peers_t *peers = uscf->peer.data;
         
         ngx_url_t                    u;
          
@@ -1589,6 +1591,9 @@ static u_char *process_config(ngx_http_request_t *r, u_char **uptr, int *errtype
             peers->peer[next_free_peer].socklen = u.addrs[i].socklen;
             ngx_memcpy(peers->peer[next_free_peer].name.data, u.addrs[i].name.data, u.addrs[i].name.len);
             peers->peer[next_free_peer].name.len = u.addrs[i].name.len;
+            ngx_memcpy(peers->peer[next_free_peer].JVMRoute, nodeinfo.mess.JVMRoute, sizeof(nodeinfo.mess.JVMRoute));
+            
+            peers->peer[next_free_peer].node_id = nodeinfo.mess.id;
             
             next_free_peer++;
             
@@ -2332,6 +2337,8 @@ static ngx_int_t ngx_http_manager_handler(ngx_http_request_t *r) {
     return (NGX_DONE);
 }
 
+ngx_int_t ngx_http_proxy_add_variables(ngx_conf_t *cf);
+
 static ngx_int_t ngx_http_manager_preconfiguration(ngx_conf_t *cf) {
 
     ngx_pool_t *global_pool;
@@ -2342,6 +2349,9 @@ static ngx_int_t ngx_http_manager_preconfiguration(ngx_conf_t *cf) {
         return NGX_ERROR;
     }
     mem_getstorage(global_pool, "");
+    
+    ngx_http_proxy_add_variables (cf);
+    
     return NGX_OK;
 }
 
@@ -2596,7 +2606,7 @@ static ngx_int_t ngx_http_manager_child_init(ngx_cycle_t *cycle) {
 }
 
 
-
+ngx_int_t ngx_http_upstream_init_fair(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us);
 /*
  * Config creation stuff
  */
@@ -2682,9 +2692,9 @@ static void *ngx_http_module_manager_create_manager_config(ngx_conf_t *cf) {
         
         uscf->servers = servers;
         
-        ngx_http_upstream_init_round_robin(cf, uscf);
+        ngx_http_upstream_init_fair(cf, uscf);
 
-        ngx_http_upstream_rr_peers_t *peers = uscf->peer.data;
+        ngx_http_upstream_fair_peers_t *peers = uscf->peer.data;
         
         plcf->max_peers_number = peers->number;
         
@@ -2825,4 +2835,35 @@ static const struct balancer_storage_method balancer_storage =
 
 const struct balancer_storage_method *get_balancer_storage() {
     return &balancer_storage;
+}
+
+/*
+ * routines for the sessionid_storage_method
+ */
+static ngx_int_t loc_read_sessionid(int ids, sessionidinfo_t **sessionid)
+{
+    return (get_sessionid(sessionidstatsmem, sessionid, ids));
+}
+static int loc_get_ids_used_sessionid(int *ids)
+{
+    return(get_ids_used_sessionid(sessionidstatsmem, ids)); 
+}
+static ngx_int_t loc_remove_sessionid(sessionidinfo_t *sessionid)
+{
+    return (remove_sessionid(sessionidstatsmem, sessionid));
+}
+static ngx_int_t loc_insert_update_sessionid(sessionidinfo_t *sessionid)
+{
+    return (insert_update_sessionid(sessionidstatsmem, sessionid));
+}
+ const struct  sessionid_storage_method sessionid_storage =
+{
+    loc_read_sessionid,
+    loc_get_ids_used_sessionid,
+    loc_get_max_size_sessionid,
+    loc_remove_sessionid,
+    loc_insert_update_sessionid
+};
+ const struct sessionid_storage_method *get_sessionid_storage() {
+    return &sessionid_storage;
 }
