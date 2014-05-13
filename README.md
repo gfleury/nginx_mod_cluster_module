@@ -16,6 +16,7 @@ Status
 Still in development. Lot of hard coded and PoC code. 
 
 Todo:
+
 	- Add support to AJP using https://github.com/yaoweibin/nginx_ajp_module.
 
 	- Sticky session based on URL param
@@ -27,6 +28,7 @@ Todo:
 	- Test all working and non working features
 
 Features working:
+
 	- Node/upstream dynamic configuration
 
 	- Published context routing thru nodes
