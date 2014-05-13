@@ -17,14 +17,20 @@ Still in development. Lot of hard coded and PoC code.
 
 Todo:
 	- Add support to AJP using https://github.com/yaoweibin/nginx_ajp_module.
+
 	- Sticky session based on URL param
+
 	- Handle upstream weight based on MCMP Load param
+
 	- Node remove when connection fails
+
 	- Test all working and non working features
 
 Features working:
 	- Node/upstream dynamic configuration
+
 	- Published context routing thru nodes
+
 	- Sticky session based on cookie param
 
 
