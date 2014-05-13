@@ -40,6 +40,12 @@ Features working:
 Usage
 =====
 
+Installation:
+
+./configure --with-cc-opt=-O  --add-module=/path/to/nginx_mod_cluster_module/advertise/ --add-module=/path/to/nginx_mod_cluster_module/manager/
+
+Configuration:
+
     server {
         listen       80;
         server_name  localhost;
