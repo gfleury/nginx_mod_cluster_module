@@ -866,11 +866,11 @@ ngx_http_upstream_choose_fair_peer(ngx_peer_connection_t *pc,
 
 chosen:
         
-    if (fp->ctx->sticky_data) {
+    if (fp->ctx->sticky_data[0] != '\0') {
         ngx_http_upstream_fair_peer_t *peer = &fp->peers->peer[best_idx];
         u_char *jvmroute = peer->JVMRoute;
         
-        if (fp->ctx->sticky_data && jvmroute) {
+        if (fp->ctx->sticky_data[0] != '\0' && jvmroute) {
             sessionidinfo_t ou;
             ngx_memcpy(ou.sessionid, fp->ctx->sticky_data, SESSIONIDSZ);
             ngx_memcpy(ou.JVMRoute, jvmroute, JVMROUTESZ);
