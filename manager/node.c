@@ -142,7 +142,7 @@ ngx_int_t insert_update_node(mem_t *s, nodeinfo_t *node, int *id) {
         *id = node->mess.id;
         return NGX_OK; /* updated */
     }
-
+    
     /* we have to insert it */
     rv = s->storage->ap_slotmem_alloc(s->slotmem, &ident, (void **) &ou);
     if (rv != NGX_OK) {
@@ -161,6 +161,38 @@ ngx_int_t insert_update_node(mem_t *s, nodeinfo_t *node, int *id) {
 
     /* blank the proxy status information */
     memset(&(ou->stat), '\0', SIZEOFSCORE);
+       
+    /* Initialize health status struct */
+    ngx_http_upstream_health_status_t *response_status;
+    char *pptr = (char *) ou;
+    int response_offset = NGX_ALIGN_DEFAULT((sizeof(ngx_uint_t) * 2) + sizeof(time_t) + sizeof(ngx_str_t) + sizeof(ngx_buf_t));
+    int request_data_offset = NGX_ALIGN_DEFAULT(1024);
+    
+    response_offset = NGX_ALIGN_DEFAULT(response_offset);
+    
+    pptr = pptr + ou->offset;
+    
+    response_status = (ngx_http_upstream_health_status_t *) pptr;
+
+    pptr = pptr + response_offset;
+           
+    response_status->request_data.data = (u_char *) pptr;
+        
+    response_offset += request_data_offset;
+    
+    pptr = pptr + request_data_offset;
+
+    response_status->response_buffer.start = (u_char *) pptr;
+    
+    response_status->response_buffer.pos = response_status->response_buffer.start;
+    response_status->response_buffer.last = response_status->response_buffer.start;
+    
+    pptr = (pptr + ( SIZEOFSCORE - (response_offset))) - 1;
+    
+    response_status->response_buffer.end = (u_char *) pptr;
+ 
+    ngx_snprintf(response_status->request_data.data, 1023, "GET / HTTP/1.1/r/nHost: %*s/r/n/r/n", ngx_strlen(ou->mess.Host), ou->mess.Host);
+    response_status->request_data.len = ngx_strlen(response_status->request_data.data);
 
     return NGX_OK;
 }
@@ -328,3 +360,33 @@ void sort_nodes(nodeinfo_t *nodes, int nbnodes) {
         }
     }
 }
+
+ngx_http_upstream_health_status_t *get_node_upstream_status (nodeinfo_t *node) {
+    ngx_http_upstream_health_status_t *response_status;
+    char *pptr = (char *) node;
+    int response_offset = NGX_ALIGN_DEFAULT((sizeof(ngx_uint_t) * 2) + sizeof(time_t) + sizeof(ngx_str_t) + sizeof(ngx_buf_t));
+    int request_data_offset = NGX_ALIGN_DEFAULT(1024);
+    
+    response_offset = NGX_ALIGN_DEFAULT(response_offset);
+    
+    pptr = pptr + node->offset;
+    
+    response_status = (ngx_http_upstream_health_status_t *) pptr;
+
+    pptr = pptr + response_offset;
+           
+    response_status->request_data.data = (u_char *) pptr;
+        
+    response_offset += request_data_offset;
+    
+    pptr = pptr + request_data_offset;
+
+    response_status->response_buffer.start = (u_char *) pptr;
+    
+    response_status->response_buffer.pos = response_status->response_buffer.start;
+    response_status->response_buffer.last = response_status->response_buffer.start;
+    response_status->response_buffer.end = (response_status->response_buffer.last + ( SIZEOFSCORE - (response_offset))) - 1;
+      
+    return response_status;
+}
+

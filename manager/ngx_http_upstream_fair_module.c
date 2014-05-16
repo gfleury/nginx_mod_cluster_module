@@ -782,16 +782,16 @@ static ngx_int_t ngx_http_upstream_get_sticky_peer(ngx_peer_connection_t *pc, ng
         return best_idx;
     
     int sessions[DEFMAXSESSIONID];
-    ngx_uint_t sizebalancer = sessionid_storage->get_ids_used_sessionid(sessions);
+    ngx_uint_t sizesessionid = sessionid_storage->get_ids_used_sessionid(sessions);
     
-    if (sizebalancer == 0)
+    if (sizesessionid == 0)
         return best_idx;
     
-    for (i = 0; i < sizebalancer; i++) {
+    for (i = 0; i < sizesessionid; i++) {
         sessionidinfo_t* si;
         int sessions_index = sessions[i];
         sessionid_storage->read_sessionid(sessions_index, &si);
-        if (fp->ctx->sticky_data && !ngx_memcmp(si->sessionid, fp->ctx->sticky_data, sizeof(si->sessionid))) {            
+        if (fp->ctx->sticky_data[0] != '\0' && !ngx_memcmp(si->sessionid, fp->ctx->sticky_data, sizeof(si->sessionid))) {            
             ngx_uint_t j;
             ngx_log_error(NGX_LOG_DEBUG, pc->log, 0, "[upstream_fair] find sticky %s", si->sessionid);
             
@@ -808,8 +808,7 @@ static ngx_int_t ngx_http_upstream_get_sticky_peer(ngx_peer_connection_t *pc, ng
                     break;    
                 }
             }
-            
-            
+                      
         }
     }
     

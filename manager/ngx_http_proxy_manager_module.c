@@ -1380,7 +1380,7 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
                     u.url.data = n->mess.Host;
                     u.url.len = ngx_strlen(n->mess.Host);
 
-                    u.default_port = 8080; //FIX-ME Add real port
+                    u.default_port = ngx_atoi(n->mess.Port, ngx_strlen(n->mess.Port)); 
 
                     if (ngx_parse_url(r->pool, &u) != NGX_OK) {
                         if (u.err) {
@@ -1394,6 +1394,13 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
                         peers->peer[next_free_peer].socklen = u.addrs[j].socklen;
                         ngx_memcpy(peers->peer[next_free_peer].name.data, u.addrs[j].name.data, u.addrs[j].name.len);
                         peers->peer[next_free_peer].name.len = u.addrs[j].name.len;
+                        ngx_memcpy(peers->peer[next_free_peer].JVMRoute, n->mess.JVMRoute, sizeof(n->mess.JVMRoute));
+ 
+                        if (n->mess.timeout)
+                            peers->peer[next_free_peer].fail_timeout = n->mess.timeout;
+                        
+                        peers->peer[next_free_peer].max_fails = balancer_info->Maxattempts;
+                        
                         peers->peer[next_free_peer].node_id = n->mess.id;    
                         
                         next_free_peer++;
@@ -1434,6 +1441,10 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
                     if (*p_sticky_start == '|') {
                         cookie.data = ++p_sticky_start;
                         sticky_len = 0;
+                    }
+                    if (*p_sticky_start == '\0') {
+                        ctx->sticky_data[0] = '\0';
+                        break;
                     }
                 }
                 sticky_len++;

@@ -246,4 +246,6 @@ typedef struct {
     u_char                      sticky_data[SESSIONIDSZ];
 } ngx_http_proxy_ctx_t;
 
+balancerinfo_t *loc_search_balancer(balancerinfo_t *balancer);
+
 #endif

@@ -782,12 +782,171 @@ static int is_same_node(nodeinfo_t *nodeinfo, nodeinfo_t *node) {
     /* All other fields can be modified without causing problems */
     return -1;
 }
+void ngx_http_health_send_request(ngx_connection_t *c) {
+    ssize_t size;
+    ssize_t send_pos = 0;
+    ngx_http_upstream_health_status_t *respose_status = c->data;
+    
+    do {
+        size = c->send(c, respose_status->request_data.data + send_pos, respose_status->request_data.len - send_pos);
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0, "healthcheck: Send size %z", size);
+        if (size == NGX_ERROR || size == 0) {
+            // If the send fails, the connection is bad. Close it out
+            ngx_close_connection(c);
+            c = NULL;
+            break;
+        } else if (size == NGX_AGAIN) {
+            // I guess this means return and try again later
+            break;
+        } else {
+            send_pos += size;
+        }
+    } while (send_pos < (ssize_t)respose_status->request_data.len);
 
-static int isnode_up(ngx_http_request_t *r, int id, int Load) {
-    //    if (balancerhandler != NULL) {
-    //        return (balancerhandler->proxy_node_isup(r, id, Load));
-    //    }
+    if (send_pos > (ssize_t)respose_status->request_data.len) {
+        ngx_log_error(NGX_LOG_WARN, c->log, 0, "healthcheck: Logic error. %z send pos bigger than buffer len %i", send_pos, respose_status->request_data.len);
+    } else if (send_pos == (ssize_t)respose_status->request_data.len) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "healthcheck: Finished sending request");
+    }
+}
+
+
+void ngx_http_health_write_handler(ngx_event_t *wev) {
+    ngx_connection_t *c;
+
+    c = wev->data;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, wev->log, 0,
+            "healthcheck: Write handler called");
+
+    ngx_http_health_send_request(c);
+}
+
+void ngx_http_health_read_handler(ngx_event_t *rev) {
+    ngx_connection_t *c;    
+    ssize_t size;
+    ngx_buf_t *rb;    
+//    ngx_int_t rc;    
+    ngx_http_upstream_health_status_t *response_status;    
+    ngx_int_t expect_finished;
+        
+    c = rev->data;
+    response_status = c->data;
+
+    rb = &response_status->response_buffer;
+    
+    do {
+        size = c->recv(c, rb->pos, rb->end - rb->pos);
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, rev->log, 0, "health: Recv size %z when I wanted %O", size, rb->end - rb->pos);
+        if (size == NGX_ERROR) {
+            break;
+        } else if (size == NGX_AGAIN) {
+            break;
+        } else if (size == 0) {
+            expect_finished = 1;
+            break;
+        } else {
+            rb->pos += size;
+        }
+    } while (rb->pos < rb->end);    
+    
+    
+    
+    ngx_close_connection(c);
+    c = NULL;
+}
+
+static ngx_int_t ngx_http_health_connect(ngx_http_request_t *r, struct sockaddr *sockaddr, socklen_t socklen, ngx_str_t *name, void *data) {
+   
+    ngx_int_t rc = NGX_ERROR;
+    ngx_peer_connection_t *pc;
+    ngx_connection_t *c;
+
+    pc = ngx_palloc(r->pool, sizeof (ngx_peer_connection_t));
+
+    if (!pc)
+        return NGX_ERROR;
+
+    ngx_memzero(pc, sizeof (ngx_peer_connection_t));
+
+    pc->get = ngx_event_get_peer;
+
+
+    pc->sockaddr = sockaddr;
+    pc->socklen = socklen;
+    pc->name = name;
+
+    pc->log = r->connection->log;
+    pc->log_error = NGX_ERROR_ERR;
+
+    pc->cached = 0;
+    pc->connection = NULL;
+
+    rc = ngx_event_connect_peer(pc);
+    if (rc == NGX_ERROR || rc == NGX_BUSY || rc == NGX_DECLINED) {
+        ngx_log_error(NGX_LOG_CRIT, r->connection->log, 0, "health: Could not connect to peer: %i", rc);
+        if (pc->connection) {
+            ngx_close_connection(pc->connection);
+        }
+
+        return NGX_ERROR;
+    }
+
+    c = pc->connection;
+    c->data = data;
+    c->log = pc->log;
+    c->write->handler = ngx_http_health_write_handler;
+    c->read->handler = ngx_http_health_read_handler;
+    c->sendfile = 0;
+    c->read->log = c->log;
+    c->write->log = c->log;
+
+    ngx_http_health_send_request(c);
+    
     return NGX_OK;
+}
+
+static int isnode_up(ngx_http_request_t *r, int id, int load) {
+    nodeinfo_t *node;
+    ngx_int_t rc;
+
+    if (loc_read_node(id, &node) != NGX_OK)
+        return NGX_ERROR;
+     
+    if ((load >= 0 || load == -2)) {
+        ngx_url_t u;
+
+        u.url.data = node->mess.Host;
+        u.url.len = ngx_strlen(node->mess.Host);
+
+        u.default_port = ngx_atoi(node->mess.Port, ngx_strlen(node->mess.Port));
+
+        if (ngx_parse_url(r->pool, &u) != NGX_OK) {
+            if (u.err) {
+                ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "%s in isnode \"%V\"", u.err, &u.url);
+            }
+            return NGX_ERROR;
+        }
+        
+        if (u.naddrs > 0) {
+            ngx_http_upstream_health_status_t *response_status;
+            ngx_int_t addrs_idx = u.naddrs - 1;
+            response_status = get_node_upstream_status (node);
+            rc = ngx_http_health_connect(r, u.addrs[addrs_idx].sockaddr, u.addrs[addrs_idx].socklen, &u.addrs[addrs_idx].name, response_status);
+        } else
+            rc = NGX_ERROR;
+        
+        if (rc != NGX_OK)
+            return rc;
+              
+    }
+    
+    if (load == -2) {
+        return NGX_OK;
+    }
+    
+    
+    return (NGX_OK);
 }
 
 /*
@@ -795,9 +954,7 @@ static int isnode_up(ngx_http_request_t *r, int id, int Load) {
  * Do a ping/png request to the node and set the load factor.
  */
 static int ishost_up(ngx_http_request_t *r, u_char *scheme, u_char *host, u_char *port) {
-    //   if (balancerhandler != NULL) {
-    //       return (balancerhandler->proxy_host_isup(r, scheme, host, port));
-    //   }
+//    return (proxy_host_isup(r, scheme, host, port));
     return NGX_OK;
 }
 
@@ -1332,7 +1489,7 @@ static u_char *process_config(ngx_http_request_t *r, u_char **uptr, int *errtype
     nodeinfo_t *node;
     balancerinfo_t balancerinfo;
     int mpm_threads = 0;
-
+    
     char **ptr = (char **) uptr;
 
     struct cluster_host *vhost;
@@ -1576,7 +1733,7 @@ static u_char *process_config(ngx_http_request_t *r, u_char **uptr, int *errtype
         u.url.data = pnode_host;
         u.url.len = ngx_strlen(pnode_host);
 
-        u.default_port = 8080;
+        u.default_port = ngx_atoi(nodeinfo.mess.Port, ngx_strlen(nodeinfo.mess.Port));
 
         if (ngx_parse_url(r->pool, &u) != NGX_OK) {
             if (u.err) {
@@ -1592,6 +1749,11 @@ static u_char *process_config(ngx_http_request_t *r, u_char **uptr, int *errtype
             ngx_memcpy(peers->peer[next_free_peer].name.data, u.addrs[i].name.data, u.addrs[i].name.len);
             peers->peer[next_free_peer].name.len = u.addrs[i].name.len;
             ngx_memcpy(peers->peer[next_free_peer].JVMRoute, nodeinfo.mess.JVMRoute, sizeof(nodeinfo.mess.JVMRoute));
+            
+            if (nodeinfo.mess.timeout)
+                peers->peer[next_free_peer].fail_timeout = nodeinfo.mess.timeout;
+            
+            peers->peer[next_free_peer].max_fails = balancerinfo.Maxattempts;
             
             peers->peer[next_free_peer].node_id = nodeinfo.mess.id;
             
@@ -1626,7 +1788,7 @@ static u_char *process_config(ngx_http_request_t *r, u_char **uptr, int *errtype
         *errtype = TYPEMEM;
         return (u_char *) MNODEUI;
     }
-
+    
     /* Insert the Alias and corresponding Context */
     phost = vhost;
     if (phost->host == NULL && phost->context == NULL)
@@ -1693,8 +1855,8 @@ static u_char *process_dump(ngx_http_request_t *r, int *errtype) {
                 ngx_strlen(ou->mess.Host), ou->mess.Host,
                 ngx_strlen(ou->mess.Port), ou->mess.Port,
                 ngx_strlen(ou->mess.Type), ou->mess.Type,
-                ou->mess.flushpackets, ou->mess.flushwait / 1000, (int) ngx_time_from_sec(ou->mess.ping), ou->mess.smax,
-                (int) ngx_time_from_sec(ou->mess.ttl), (int) ngx_time_from_sec(ou->mess.timeout));
+                ou->mess.flushpackets, ou->mess.flushwait / 1000, (int) ngx_sec_from_time(ou->mess.ping), ou->mess.smax,
+                (int) ngx_sec_from_time(ou->mess.ttl), (int) ngx_sec_from_time(ou->mess.timeout));
     }
 
     size = loc_get_max_size_host();
@@ -1741,12 +1903,17 @@ static u_char *process_info(ngx_http_request_t *r, int *errtype) {
 
     size = loc_get_max_size_node();
 
-    ngx_buf_t *b = ngx_create_temp_buf(r->pool, 1024 * 32); // FIX-ME get some value to calculate real size
+    ngx_buf_t *b;
 
     if (size == 0)
         return NULL;
     id = ngx_palloc(r->pool, sizeof (int) * size);
     size = get_ids_used_node(nodestatsmem, id);
+    b = ngx_create_temp_buf(r->pool, (1024 * 2) * (size + 1)); // FIXED
+    
+    if (b == NULL)
+        return NULL;
+    
     for (i = 0; i < size; i++) {
         nodeinfo_t *ou;
         ///        proxy_worker_stat *proxystat;
@@ -1855,7 +2022,7 @@ static void process_error(ngx_http_request_t *r, u_char *errstring, ngx_int_t er
 }
 
 static ngx_int_t ngx_http_manager_info_handler(ngx_http_request_t *r) {
-    int size, i, sizesessionid;
+    int node_size, max_node_size, i, sizesessionid;
     int *id;
     nodeinfo_t *nodes;
     int nbnodes = 0;
@@ -1944,7 +2111,21 @@ static ngx_int_t ngx_http_manager_info_handler(ngx_http_request_t *r) {
         }
     }
 
-    ngx_buf_t *b = ngx_create_temp_buf(r->pool, 1024 * 32); // FIX-ME get some value to calculate real size
+    sizesessionid = loc_get_max_size_sessionid();
+
+    max_node_size = loc_get_max_size_node();
+    
+    if (max_node_size == 0)
+        return NGX_OK;
+    
+    id = ngx_palloc(r->pool, sizeof (int) * max_node_size);
+    
+    if (id == NULL)
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    
+    node_size = get_ids_used_node(nodestatsmem, id);
+
+    ngx_buf_t *b = ngx_create_temp_buf(r->pool, (((1024 * 2) + (128 * sizesessionid)) * (node_size + 1))); // FIXED
 
     if (b == NULL) {
         return NGX_ERROR;
@@ -1981,18 +2162,9 @@ static ngx_int_t ngx_http_manager_info_handler(ngx_http_request_t *r) {
 
     ngx_bprintf(b, "\n");
 
-    sizesessionid = loc_get_max_size_sessionid();
-
-    size = loc_get_max_size_node();
-    if (size == 0)
-        return NGX_OK;
-    id = ngx_palloc(r->pool, sizeof (int) * size);
-    size = get_ids_used_node(nodestatsmem, id);
-
-
     /* read the node to sort them by domain */
-    nodes = ngx_palloc(r->pool, sizeof (nodeinfo_t) * size);
-    for (i = 0; i < size; i++) {
+    nodes = ngx_palloc(r->pool, sizeof (nodeinfo_t) * node_size);
+    for (i = 0; i < node_size; i++) {
         nodeinfo_t *ou;
         if (get_node(nodestatsmem, &ou, id[i]) != NGX_OK)
             continue;
@@ -2002,7 +2174,7 @@ static ngx_int_t ngx_http_manager_info_handler(ngx_http_request_t *r) {
     sort_nodes(nodes, nbnodes);
 
     /* display the ordered nodes */
-    for (i = 0; i < size; i++) {
+    for (i = 0; i < node_size; i++) {
         char *flushpackets;
         nodeinfo_t *ou = &nodes[i];
         char *pptr = (char *) ou;
@@ -2044,7 +2216,7 @@ static ngx_int_t ngx_http_manager_info_handler(ngx_http_request_t *r) {
 
             ngx_bprintf(b, ",Flushpackets: %s,Flushwait: %d,Ping: %d,Smax: %d,Ttl: %d",
                     flushpackets, ou->mess.flushwait,
-                    (int) ou->mess.ping, ou->mess.smax, (int) ou->mess.ttl);
+                    (int) ngx_sec_from_time(ou->mess.ping), ou->mess.smax, (int) ngx_sec_from_time(ou->mess.ttl));
         }
 
         if (mconf->reduce_display)
@@ -2817,6 +2989,9 @@ const struct context_storage_method *get_context_storage() {
 /*
  * routines for the balancer_storage_method
  */
+balancerinfo_t *loc_search_balancer(balancerinfo_t *balancer) {
+    return (read_balancer(balancerstatsmem, balancer));
+}
 static ngx_int_t loc_read_balancer(int ids, balancerinfo_t **balancer)
 {
     return (get_balancer(balancerstatsmem, balancer, ids));

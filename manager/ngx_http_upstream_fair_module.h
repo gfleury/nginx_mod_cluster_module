@@ -46,6 +46,7 @@ typedef struct {
 #endif
     ngx_uint_t                          node_id;
     u_char                              JVMRoute[JVMROUTESZ];
+    
 } ngx_http_upstream_fair_peer_t;
 
 #define NGX_HTTP_UPSTREAM_FAIR_NO_RR            (1<<26)

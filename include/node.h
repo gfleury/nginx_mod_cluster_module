@@ -56,7 +56,19 @@ struct nodemess {
 };
 typedef struct nodemess nodemess_t; 
 
-#define SIZEOFSCORE 200 /* size of the proxy_worker_stat structure */
+
+
+#define RESPONSEBUFFERSZ    1024*1024
+#define SIZEOFSCORE (200 + RESPONSEBUFFERSZ) /* size of the proxy_worker_stat structure */
+
+typedef struct {
+    ngx_uint_t response_size;
+    time_t response_time;    
+    ngx_uint_t response_code;
+    ngx_str_t request_data;
+    ngx_buf_t response_buffer;
+} ngx_http_upstream_health_status_t;
+
 
 /* status of the node as read/store in httpd. */
 struct nodeinfo {
@@ -65,7 +77,7 @@ struct nodeinfo {
     /* filled by httpd */
     time_t updatetime;   /* time of last received message */
     int offset;              /* offset to the proxy_worker_stat structure */
-    u_char stat[SIZEOFSCORE];  /* to store the status */ 
+    u_char stat[SIZEOFSCORE];  /* to store the status */
 };
 typedef struct nodeinfo nodeinfo_t; 
 
@@ -204,6 +216,8 @@ void (*remove_host_context)(int node, ngx_pool_t *pool);
 };
 
 void sort_nodes(nodeinfo_t *nodes, int nbnodes);
+
+ngx_http_upstream_health_status_t *get_node_upstream_status (nodeinfo_t *node);
 
 #endif	/* NODE_H */
 
