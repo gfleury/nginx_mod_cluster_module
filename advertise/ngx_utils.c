@@ -1018,3 +1018,64 @@ ngx_int_t ngx_http_send_buffer(ngx_http_request_t *r, ngx_buf_t *b, ngx_uint_t s
     
     return ngx_http_output_filter(r, &out);
 }
+
+ngx_int_t ngx_http_parse_header_inside_value (ngx_table_elt_t *h, ngx_str_t *name, ngx_str_t *value) {
+    ngx_uint_t rv = NGX_OK;
+    u_char *start, *last, *end, ch;
+
+    start = h->value.data;
+    end = h->value.data + h->value.len;
+
+    while (start < end) {
+
+        if (ngx_strncasecmp(start, name->data, name->len) != 0) {
+            goto skip;
+        }
+
+        for (start += name->len; start < end && *start == ' '; start++) {
+            /* void */
+        }
+
+        if (value == NULL) {
+            if (start == end || *start == ',') {
+                return rv;
+            }
+
+            goto skip;
+        }
+
+        if (start == end || *start++ != '=') {
+            /* the invalid header value */
+            goto skip;
+        }
+
+        while (start < end && *start == ' ') {
+            start++;
+        }
+
+        for (last = start; last < end && *last != ';'; last++) {
+            /* void */
+        }
+
+        value->len = last - start;
+        value->data = start;
+
+        return rv;
+
+skip:
+
+        while (start < end) {
+            ch = *start++;
+            if (ch == ';' || ch == ',') {
+                break;
+            }
+        }
+
+        while (start < end && *start == ' ') {
+            start++;
+        }
+    }
+
+    return NGX_DECLINED;
+
+}

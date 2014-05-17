@@ -206,7 +206,7 @@ ngx_int_t insert_update_node(mem_t *s, nodeinfo_t *node, int *id) {
 static ngx_int_t loc_read_node(void* mem, void **data, int id, ngx_pool_t *pool) {
     nodeinfo_t *in = (nodeinfo_t *)*data;
     nodeinfo_t *ou = (nodeinfo_t *)mem;
-    if (ngx_strncmp(in->mess.JVMRoute, ou->mess.JVMRoute, ngx_strlen(in->mess.JVMRoute)) == 0) {
+    if (ngx_strncmp(in->mess.JVMRoute, ou->mess.JVMRoute, ngx_strlen(ou->mess.JVMRoute)) == 0) {
         *data = ou;
         return NGX_OK;
     }

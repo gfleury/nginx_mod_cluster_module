@@ -914,6 +914,8 @@ static int isnode_up(ngx_http_request_t *r, int id, int load) {
     if (loc_read_node(id, &node) != NGX_OK)
         return NGX_ERROR;
 
+    return NGX_OK;
+    
     if ((load >= 0 || load == -2)) {
         ngx_url_t u;
 
@@ -1711,8 +1713,10 @@ static u_char *process_config(ngx_http_request_t *r, u_char **uptr, int *errtype
     /* check for removed node */
     node = read_node(nodestatsmem, &nodeinfo);
     if (node != NULL) {
+        nodeinfo_t *node_copy = ngx_palloc (r->pool, sizeof(nodeinfo_t));
+        ngx_memcpy (node_copy, &nodeinfo, sizeof(nodeinfo_t));
         /* If the node is removed (or kill and restarted) and recreated unchanged that is ok: network problems */
-        if (!is_same_node(node, &nodeinfo)) {
+        if (!is_same_node(node, node_copy)) {
             /* Here we can't update it because the old one is still in */
             ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "process_config: node %s already exist", node->mess.JVMRoute);
             strcpy((char *) node->mess.JVMRoute, "REMOVED");
@@ -1730,7 +1734,8 @@ static u_char *process_config(ngx_http_request_t *r, u_char **uptr, int *errtype
         return (u_char *) MNODEUI;
     }
 
-    if (balancerinfo.id != 0) {
+    /* Check if node already exists, two same configs happens, networks problems */
+    if (!node && balancerinfo.id != 0) {
         /* 
          * Define nginx proxys configuration
          */

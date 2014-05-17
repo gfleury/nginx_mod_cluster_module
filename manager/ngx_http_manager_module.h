@@ -244,8 +244,11 @@ typedef struct {
     ngx_uint_t                     head;  /* unsigned  head:1 */
     ngx_http_proxy_loc_conf_t  *plcf;
     u_char                      sticky_data[SESSIONIDSZ];
+    u_char                      JVMRoute[JVMROUTESZ];
+    balancerinfo_t              *balancer;
 } ngx_http_proxy_ctx_t;
 
 balancerinfo_t *loc_search_balancer(balancerinfo_t *balancer);
+
 
 #endif

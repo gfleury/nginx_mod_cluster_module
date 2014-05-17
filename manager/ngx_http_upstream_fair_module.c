@@ -802,9 +802,18 @@ static ngx_int_t ngx_http_upstream_get_sticky_peer(ngx_peer_connection_t *pc, ng
                 peer = &fp->peers->peer[n];
                 nreq = fp->peers->peer[n].shared->nreq;
                 
-                if (!ngx_memcmp(peer->JVMRoute, si->JVMRoute, sizeof(si->JVMRoute))) { 
+                if (!ngx_memcmp(peer->JVMRoute, si->JVMRoute, sizeof (si->JVMRoute))) {
                     ngx_log_error(NGX_LOG_DEBUG, pc->log, 0, "[upstream_fair] found sticky %s pointing to %s", si->sessionid, si->JVMRoute);
                     best_idx = n;
+
+                    if (ngx_http_upstream_fair_try_peer(pc, fp, n) != NGX_OK) {
+                        if (!pc->tries) {
+                            ngx_log_debug(NGX_LOG_DEBUG_HTTP, pc->log, 0, "[upstream_fair] all backends exhausted");
+                            return NGX_PEER_INVALID;
+                        }
+
+                        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0, "[upstream_fair] backend %d already tried", n);
+                    }
                     break;    
                 }
             }
@@ -812,16 +821,6 @@ static ngx_int_t ngx_http_upstream_get_sticky_peer(ngx_peer_connection_t *pc, ng
         }
     }
     
-    if (ngx_http_upstream_fair_try_peer(pc, fp, n) != NGX_OK) {
-        if (!pc->tries) {
-            ngx_log_debug(NGX_LOG_DEBUG_HTTP, pc->log, 0, "[upstream_fair] all backends exhausted");
-            return NGX_PEER_INVALID;
-        }
-
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0, "[upstream_fair] backend %d already tried", n);
-    }
-
-
     return best_idx;
 }
 
@@ -832,7 +831,9 @@ ngx_http_upstream_choose_fair_peer(ngx_peer_connection_t *pc,
     ngx_uint_t                          npeers;
     ngx_uint_t                          best_idx = NGX_PEER_INVALID;
     ngx_uint_t                          weight_mode;
-
+    ngx_http_upstream_fair_peer_t       *peer;
+    u_char                              *jvmroute;
+    
     npeers = fp->peers->number;
     weight_mode = fp->peers->weight_mode;
 
@@ -865,18 +866,11 @@ ngx_http_upstream_choose_fair_peer(ngx_peer_connection_t *pc,
     return NGX_BUSY;
 
 chosen:
-        
-    if (fp->ctx->sticky_data[0] != '\0') {
-        ngx_http_upstream_fair_peer_t *peer = &fp->peers->peer[best_idx];
-        u_char *jvmroute = peer->JVMRoute;
-        
-        if (fp->ctx->sticky_data[0] != '\0' && jvmroute) {
-            sessionidinfo_t ou;
-            ngx_memcpy(ou.sessionid, fp->ctx->sticky_data, SESSIONIDSZ);
-            ngx_memcpy(ou.JVMRoute, jvmroute, JVMROUTESZ);
-            sessionid_storage->insert_update_sessionid(&ou);
-        }
-    }
+      
+    peer = &fp->peers->peer[best_idx];
+    jvmroute = peer->JVMRoute;    
+    ngx_memcpy(fp->ctx->JVMRoute, jvmroute, JVMROUTESZ);
+    
         
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0, "[upstream_fair] chose peer %i", best_idx);
     *peer_id = best_idx;

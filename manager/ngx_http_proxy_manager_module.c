@@ -1418,7 +1418,7 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
 
         if (balancer_info->StickySession) {
             u_char *p_sticky_start = ngx_pstrdup3(r->pool, balancer_info->StickySessionCookie);
-            ngx_str_t route = {0, 0};
+            ngx_str_t session_sticky = {0, 0};
             ngx_str_t cookie = {0, 0};
             int sticky_len = 0;
             
@@ -1429,12 +1429,12 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
                     cookie.len = sticky_len;
                     if (ngx_http_parse_multi_header_lines(&r->headers_in.cookies,
                             &cookie,
-                            &route) != NGX_DECLINED) {
+                            &session_sticky) != NGX_DECLINED) {
                         /* a route cookie has been found. Let's give it a try */
                         ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                                 "[sticky/init_sticky_peer] got cookie route=%V, "
-                                "let's try to find a matching peer", &route);
-                        ngx_memcpy(ctx->sticky_data, route.data, route.len <= SESSIONIDSZ ? route.len : SESSIONIDSZ);
+                                "let's try to find a matching peer", &session_sticky);
+                        ngx_memcpy(ctx->sticky_data, session_sticky.data, session_sticky.len <= SESSIONIDSZ ? session_sticky.len : SESSIONIDSZ);
                         break;
 
                     }
@@ -1453,6 +1453,7 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
         }
         
         ctx->plcf = plcf;
+        ctx->balancer = balancer_info;
     }
     
     return (plcf);
@@ -2765,6 +2766,76 @@ ngx_http_proxy_abort_request(ngx_http_request_t *r)
 
 
 static void ngx_http_proxy_finalize_request(ngx_http_request_t *r, ngx_int_t rc) {
+    
+    ngx_http_proxy_ctx_t *ctx;
+    ctx = ngx_http_get_module_ctx(r, ngx_http_manager_module);
+
+    balancerinfo_t *balancer_info = ctx->balancer;
+
+    if (balancer_info->StickySession) {
+        u_char *p_sticky_start = ngx_pstrdup3(r->pool, balancer_info->StickySessionCookie);
+        ngx_str_t cookie = {0, 0};
+        int sticky_len = 0;
+
+        cookie.data = p_sticky_start;
+
+        for (; p_sticky_start;) {
+            if (*p_sticky_start == '|' || *p_sticky_start == '\0') {
+                ngx_uint_t idx;    
+                ngx_list_part_t              *part;
+                ngx_table_elt_t              *header;
+                ngx_str_t session_sticky;
+                
+                cookie.len = sticky_len;
+                
+                part = &r->upstream->headers_in.headers.part;
+                header = part->elts;
+
+                for (idx = 0; /* void */; idx++) {
+
+                    if (idx >= part->nelts) {
+                        if (part->next == NULL) {
+                            break;
+                        }
+
+                        part = part->next;
+                        header = part->elts;
+                        idx = 0;
+                    }
+                    
+                    if (!ngx_strncmp("Set-Cookie", header[idx].key.data, header[idx].key.len)) {                            
+                        if (ngx_http_parse_header_inside_value(&header[idx], &cookie, &session_sticky) != NGX_DECLINED) {
+                            ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "ngx_http_proxy_finalize_request: Found Set-Cookie value %V", &session_sticky);
+                            ngx_memcpy(ctx->sticky_data, session_sticky.data, session_sticky.len <= SESSIONIDSZ ? session_sticky.len : SESSIONIDSZ);
+                            break;
+                        }
+                    }
+                }
+                if (*p_sticky_start == '|') {
+                    cookie.data = ++p_sticky_start;
+                    sticky_len = 0;
+                }
+                if (*p_sticky_start == '\0') {
+                    break;
+                }
+            }
+            sticky_len++;
+            p_sticky_start++;
+        }
+    }
+
+
+    if (ctx->sticky_data[0] != '\0' && ctx->JVMRoute[0] != '\0') {
+        u_char *jvmroute = ctx->JVMRoute;
+
+        if (ctx->sticky_data[0] != '\0' && jvmroute) {
+            sessionidinfo_t ou;
+            ngx_memcpy(ou.sessionid, ctx->sticky_data, SESSIONIDSZ);
+            ngx_memcpy(ou.JVMRoute, jvmroute, JVMROUTESZ);
+            sessionid_storage->insert_update_sessionid(&ou);
+        }
+    }
+
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "finalize http proxy request");
 

@@ -98,7 +98,7 @@ static ngx_int_t insert_update(void* mem, void **data, int id, ngx_pool_t *pool)
 {
     contextinfo_t *in = (contextinfo_t *)*data;
     contextinfo_t *ou = (contextinfo_t *)mem;
-    if (strcmp(in->context, ou->context) == 0 &&
+    if (ngx_strcmp(in->context, ou->context) == 0 &&
                in->vhost == ou->vhost && in->node == ou->node) {
         /* We don't update nbrequests it belongs to mod_proxy_cluster logic */
         ou->status = in->status;

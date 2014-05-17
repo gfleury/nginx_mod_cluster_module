@@ -96,7 +96,7 @@ static ngx_int_t insert_update(void* mem, void **data, int id, ngx_pool_t *pool)
 {
     sessionidinfo_t *in = (sessionidinfo_t *)*data;
     sessionidinfo_t *ou = (sessionidinfo_t *)mem;
-    if (strcmp(in->sessionid, ou->sessionid) == 0) {
+    if (ngx_strcmp(in->sessionid, ou->sessionid) == 0) {
         memcpy(ou, in, sizeof(sessionidinfo_t));
         ou->id = id;
         ou->updatetime = time(NULL);
