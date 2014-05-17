@@ -913,8 +913,6 @@ static int isnode_up(ngx_http_request_t *r, int id, int load) {
 
     if (loc_read_node(id, &node) != NGX_OK)
         return NGX_ERROR;
-
-    return NGX_OK;
     
     if ((load >= 0 || load == -2)) {
         ngx_url_t u;
