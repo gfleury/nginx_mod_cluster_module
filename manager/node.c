@@ -191,7 +191,7 @@ ngx_int_t insert_update_node(mem_t *s, nodeinfo_t *node, int *id) {
     
     response_status->response_buffer.end = (u_char *) pptr;
  
-    ngx_snprintf(response_status->request_data.data, 1023, "GET / HTTP/1.1/r/nHost: %*s/r/n/r/n", ngx_strlen(ou->mess.Host), ou->mess.Host);
+    ngx_snprintf(response_status->request_data.data, 1023, "GET / HTTP/1.0\r\nHost: %*s\r\n\r\n", ngx_strlen(ou->mess.Host), ou->mess.Host);
     response_status->request_data.len = ngx_strlen(response_status->request_data.data);
 
     return NGX_OK;

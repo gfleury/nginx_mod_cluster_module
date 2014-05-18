@@ -237,4 +237,6 @@ ngx_int_t ngx_http_send_buffer(ngx_http_request_t *r, ngx_buf_t *b, ngx_uint_t s
 
 ngx_int_t ngx_http_parse_header_inside_value(ngx_table_elt_t *h, ngx_str_t *name, ngx_str_t *value);
 
+unsigned long hash(const u_char *str);
+
 #endif

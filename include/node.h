@@ -58,7 +58,7 @@ typedef struct nodemess nodemess_t;
 
 
 
-#define RESPONSEBUFFERSZ    0 //1024*1024
+#define RESPONSEBUFFERSZ    128*1024
 #define SIZEOFSCORE (200 + RESPONSEBUFFERSZ) /* size of the proxy_worker_stat structure */
 
 typedef struct {

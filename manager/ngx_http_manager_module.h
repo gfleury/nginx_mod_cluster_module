@@ -185,7 +185,7 @@ typedef struct mod_manager_config {
     int enable_mcpm_receive;
     
     
-    ngx_http_proxy_loc_conf_t  *plcf[DEFMAXHOST];
+    ngx_http_proxy_loc_conf_t  *plcf[DEFMAXCONTEXT];
     
 } mod_manager_config;
 

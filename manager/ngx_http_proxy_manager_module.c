@@ -1291,7 +1291,7 @@ static node_context *find_node_context_host(ngx_http_request_t *r, const char *r
  * @context_table table of contexts.
  * @return the balancer name or NULL if not found.
  */ 
-static u_char *get_context_host_balancer(ngx_http_request_t *r, proxy_vhost_table *vhost_table, proxy_context_table *context_table, proxy_node_table *node_table) {
+static u_char *get_context_host_balancer(ngx_http_request_t *r, proxy_vhost_table *vhost_table, proxy_context_table *context_table, proxy_node_table *node_table, ngx_uint_t *context_proxy_idx) {
     node_context *nodes =  find_node_context_host(r, NULL, vhost_table, context_table, node_table);
     if (nodes == NULL)
         return NULL;
@@ -1302,6 +1302,12 @@ static u_char *get_context_host_balancer(ngx_http_request_t *r, proxy_vhost_tabl
             continue;
         }
         if (node->mess.balancer) { 
+            contextinfo_t *context;
+            if (context_storage->read_context((*nodes).context, &context) != NGX_OK) {
+                nodes++;
+                continue;
+            }
+            *context_proxy_idx = hash ((u_char *)context->context) % DEFMAXCONTEXT;                    
             return node->mess.balancer;
         }
         nodes++;
@@ -1323,6 +1329,10 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
     u_char *balancer;
     balancerinfo_t *balancer_info = NULL;
     int i;
+    int len = 0;
+    int balancer_id = 0;
+    ngx_uint_t context_proxy_index = 0;
+    
     
     node_storage = get_node_storage();
     host_storage = get_host_storage();
@@ -1340,10 +1350,7 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
     read_balancer_table(r, &balancer_table);
     read_node_table(r, &node_table);
             
-    balancer = get_context_host_balancer(r, &vhost_table, &context_table, &node_table);
-    int len = 0;
-    int balancer_id = 0;
-    
+    balancer = get_context_host_balancer(r, &vhost_table, &context_table, &node_table, &context_proxy_index);
     
     if (balancer)
          len = ngx_strlen(balancer);
@@ -1359,7 +1366,8 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
     
     if (balancer_id) {    
         mod_manager_config *mconf = ngx_http_get_module_srv_conf(r, ngx_http_manager_module);
-        plcf = mconf->plcf[balancer_id-1];
+
+        plcf = mconf->plcf[context_proxy_index];
     }
         
     if (plcf) {
