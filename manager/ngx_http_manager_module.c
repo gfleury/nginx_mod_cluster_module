@@ -619,63 +619,6 @@ static ngx_int_t insert_update_contexts(mem_t *mem, u_char *str, int node, int v
     return ret;
 }
 
-ngx_int_t insert_node_to_proxy(ngx_http_request_t *r, nodeinfo_t *node, ngx_uint_t context_proxy_index) {
-    mod_manager_config *mconf = ngx_http_get_module_srv_conf(r, ngx_http_manager_module);
-
-    /* 
-     * Define nginx proxys configuration
-     */
-    ngx_http_proxy_loc_conf_t *plcf = mconf->plcf[context_proxy_index];
-    ngx_http_upstream_srv_conf_t *uscf = plcf->upstream.upstream;
-    ngx_http_upstream_fair_peers_t *peers = uscf->peer.data;
-
-    ngx_url_t u;
-
-    u_int i;
-    u_char *pnode_host = node->mess.Host;
-
-    ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "Updating proxy_struct from context_index: %d %s", context_proxy_index, pnode_host);
-
-    int next_free_peer = peers->number;
-
-    if (next_free_peer >= plcf->max_peers_number) {
-        return NGX_ERROR;
-    }
-
-    u.url.data = pnode_host;
-    u.url.len = ngx_strlen(pnode_host);
-
-    u.default_port = ngx_atoi(node->mess.Port, ngx_strlen(node->mess.Port));
-
-    if (ngx_parse_url(r->pool, &u) != NGX_OK) {
-        if (u.err) {
-            ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "%s in upstream \"%V\"", u.err, &u.url);
-        }
-        return NGX_ERROR;
-    }
-
-    for (i = 0; i < u.naddrs; i++) {
-        ngx_memcpy(peers->peer[next_free_peer].sockaddr, u.addrs[i].sockaddr, u.addrs[i].socklen);
-        peers->peer[next_free_peer].socklen = u.addrs[i].socklen;
-        ngx_memcpy(peers->peer[next_free_peer].name.data, u.addrs[i].name.data, u.addrs[i].name.len);
-        peers->peer[next_free_peer].name.len = u.addrs[i].name.len;
-        ngx_memcpy(peers->peer[next_free_peer].JVMRoute, node->mess.JVMRoute, sizeof (node->mess.JVMRoute));
-
-        if (node->mess.timeout)
-            peers->peer[next_free_peer].fail_timeout = node->mess.timeout;
-
-        peers->peer[next_free_peer].node_id = node->mess.id;
-
-        next_free_peer++;
-
-    }
-
-    peers->number = next_free_peer;
-
-    plcf->updatetime = time(NULL);
-
-    return NGX_OK;
-}
 /*
  * Process Functions, do the job
  */
@@ -715,12 +658,6 @@ static u_char *process_node_cmd(ngx_http_request_t *r, int status, int *errtype,
                 if (status != REMOVE) {
                     context->status = status;
                     insert_update_context(contextstatsmem, context);
-                    if (status == ENABLED && context->id) {
-                        ngx_uint_t context_proxy_index = hash((u_char *) context->context) % DEFMAXCONTEXT;
-                        if (insert_node_to_proxy(r, node, context_proxy_index) != NGX_OK) {
-                            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "process_node_cmd %d Unable to process node to proxy: %d", status, node->mess.id);
-                        }
-                    }
                 } else
                     remove_context(contextstatsmem, context);
 
@@ -1222,14 +1159,6 @@ static u_char *process_appl_cmd(ngx_http_request_t *r, u_char **ptr, int status,
     if (insert_update_contexts(contextstatsmem, vhost->context, node->mess.id, host->vhost, status) != NGX_OK) {
         *errtype = TYPEMEM;
         return (u_char *) MCONTUI;
-    }
-
-    if (status == ENABLED && !node) {
-        ngx_uint_t context_proxy_index = hash(vhost->context);
-        if (insert_node_to_proxy(r, node, context_proxy_index) != NGX_OK) {
-            *errtype = TYPEMEM;
-            return (u_char *) MCONTUI;
-        }
     }
 
     /* Remove the host if all the contextes have been removed */
