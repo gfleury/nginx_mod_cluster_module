@@ -1404,10 +1404,12 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
                         peers->peer[next_free_peer].name.len = u.addrs[j].name.len;
                         ngx_memcpy(peers->peer[next_free_peer].JVMRoute, n->mess.JVMRoute, sizeof(n->mess.JVMRoute));
  
-                        if (n->mess.timeout)
-                            peers->peer[next_free_peer].fail_timeout = n->mess.timeout;
+                        if (n->mess.ttl)
+                            peers->peer[next_free_peer].fail_timeout = ngx_sec_from_time(n->mess.ttl);
                         
                         peers->peer[next_free_peer].max_fails = balancer_info->Maxattempts;
+                        
+                        peers->peer[next_free_peer].weight = 100;
                         
                         peers->peer[next_free_peer].node_id = n->mess.id;    
                         

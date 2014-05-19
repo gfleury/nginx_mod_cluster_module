@@ -906,6 +906,9 @@ static ngx_int_t ngx_http_health_connect(ngx_http_request_t *r, struct sockaddr 
 
     return NGX_OK;
 }
+static int loc_get_max_size_context();
+static int loc_get_ids_used_context(int *ids);
+static ngx_int_t loc_read_context(int ids, contextinfo_t **context);
 
 static int isnode_up(ngx_http_request_t *r, int id, int load) {
     nodeinfo_t *node;
@@ -934,6 +937,35 @@ static int isnode_up(ngx_http_request_t *r, int id, int load) {
             ngx_int_t addrs_idx = u.naddrs - 1;
             response_status = get_node_upstream_status(node);
             rc = ngx_http_health_connect(r, u.addrs[addrs_idx].sockaddr, u.addrs[addrs_idx].socklen, &u.addrs[addrs_idx].name, response_status);
+            if (rc == NGX_OK) {
+                int i;
+                int size;
+                mod_manager_config *mconf = ngx_http_get_module_srv_conf(r, ngx_http_manager_module);
+                size = loc_get_max_size_context();
+                if (size != 0) {
+                    int *contexts = ngx_palloc(r->pool, sizeof (int) * size);
+                    int sizecontext = loc_get_ids_used_context(contexts);
+                    for (i = 0; i < sizecontext; i++) {
+                        contextinfo_t* h;
+                        int context_index = contexts[i];
+                        ngx_uint_t context_proxy_idx = 0;
+                        ngx_http_proxy_loc_conf_t  *plcf = NULL;
+                        loc_read_context(context_index, &h);
+                        if (!h)
+                            continue;
+                        context_proxy_idx = hash ((u_char *)h->context) % DEFMAXCONTEXT;
+                        plcf = mconf->plcf[context_proxy_idx];
+                        ngx_http_upstream_srv_conf_t *uscf = plcf->upstream.upstream;
+                        ngx_http_upstream_fair_peers_t *peers = uscf->peer.data;
+                        ngx_uint_t i;
+                        for (i = 0; i < peers->number; i++) {
+                            if (!ngx_memcmp(peers->peer[i].sockaddr, u.addrs[addrs_idx].sockaddr, peers->peer[i].socklen)) {
+                                peers->peer[i].weight = load;
+                            }
+                        }
+                    }
+                }
+            }
         } else
             rc = NGX_ERROR;
 
@@ -955,7 +987,36 @@ static int isnode_up(ngx_http_request_t *r, int id, int load) {
  * Do a ping/png request to the node and set the load factor.
  */
 static int ishost_up(ngx_http_request_t *r, u_char *scheme, u_char *host, u_char *port) {
-    //    return (proxy_host_isup(r, scheme, host, port));
+     ngx_url_t u;
+     ngx_int_t rc;
+     nodeinfo_t *node, nodeinfo;
+     
+    u.url.data = host;
+    u.url.len = ngx_strlen(host);
+
+    u.default_port = ngx_atoi(port, ngx_strlen(port));
+
+    if (ngx_parse_url(r->pool, &u) != NGX_OK) {
+        if (u.err) {
+            ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "%s in isnode \"%V\"", u.err, &u.url);
+        }
+        return NGX_ERROR;
+    }
+
+    if (u.naddrs > 0) {
+        ngx_http_upstream_health_status_t *response_status;
+        ngx_int_t addrs_idx = u.naddrs - 1;
+        ngx_memcpy (nodeinfo.mess.Host, host, ngx_strlen(host));
+        node = read_node(nodestatsmem, &nodeinfo);
+        if (node)
+            response_status = get_node_upstream_status(node);
+        rc = ngx_http_health_connect(r, u.addrs[addrs_idx].sockaddr, u.addrs[addrs_idx].socklen, &u.addrs[addrs_idx].name, response_status);
+    } else
+        rc = NGX_ERROR;
+
+    if (rc != NGX_OK)
+        return rc;
+    
     return NGX_OK;
 }
 
