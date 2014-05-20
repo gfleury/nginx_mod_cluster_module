@@ -293,6 +293,64 @@ static int loc_get_max_size_jgroupsid() {
         return 0;
 }
 
+/*
+ * routines for the host_storage_method
+ */
+static ngx_int_t loc_read_host(int ids, hostinfo_t **host) {
+    return (get_host(hoststatsmem, host, ids));
+}
+
+static int loc_get_ids_used_host(int *ids) {
+    return (get_ids_used_host(hoststatsmem, ids));
+}
+static const struct host_storage_method host_storage = {
+    loc_read_host,
+    loc_get_ids_used_host,
+    loc_get_max_size_host
+};
+
+const struct host_storage_method *get_host_storage() {
+    return &host_storage;
+}
+
+/* Check is the nodes (in shared memory) were modified since last
+ * call to worker_nodes_are_updated().
+ * return codes:
+ *   0 : No update of the nodes since last time.
+ *   x: The version has changed the local table need to be updated.
+ */
+static unsigned int loc_worker_nodes_need_update(unsigned int actual) {
+    int size;
+    unsigned int last = 0;
+
+    size = loc_get_max_size_node();
+    if (size == 0)
+        return 0; /* broken */
+
+    last = get_version_node(nodestatsmem);
+ 
+    if (last != actual)
+        return last;
+    
+    return (0);
+}
+
+/* Store the last version update in the proccess config */
+static int loc_worker_nodes_are_updated(unsigned int last) {
+    //mod_manager_config *mconf = ap_get_module_config(s->module_config, &manager_module);
+    //mconf->tableversion = last;
+    return (0);
+}
+
+static ngx_int_t loc_remove_node(nodeinfo_t *node) {
+    return (remove_node(nodestatsmem, node));
+}
+
+static ngx_int_t loc_find_node(nodeinfo_t **node, const u_char *route) {
+    return (find_node(nodestatsmem, node, route));
+}
+
+
 /* Remove the virtual hosts and contexts corresponding the node */
 static void loc_remove_host_context(int node, ngx_pool_t *pool) {
     /* for read the hosts */
@@ -324,6 +382,126 @@ static void loc_remove_host_context(int node, ngx_pool_t *pool) {
         if (context->node == node)
             remove_context(contextstatsmem, context);
     }
+}
+
+
+static const struct node_storage_method node_storage = {
+    loc_read_node,
+    loc_get_ids_used_node,
+    loc_get_max_size_node,
+    loc_worker_nodes_need_update,
+    loc_worker_nodes_are_updated,
+    loc_remove_node,
+    loc_find_node,
+    loc_remove_host_context,
+};
+
+const struct node_storage_method *get_node_storage() {
+    return &node_storage;
+}
+
+/*
+ * routines for the context_storage_method
+ */
+static ngx_int_t loc_read_context(int ids, contextinfo_t **context) {
+    return (get_context(contextstatsmem, context, ids));
+}
+
+static int loc_get_ids_used_context(int *ids) {
+    return (get_ids_used_context(contextstatsmem, ids));
+}
+
+static void loc_lock_contexts() {
+    lock_contexts(contextstatsmem);
+}
+
+static void loc_unlock_contexts() {
+    unlock_contexts(contextstatsmem);
+}
+
+static unsigned int loc_context_need_update(unsigned int actual) {
+    int size;
+    unsigned int last = 0;
+
+    size = loc_get_max_size_context();
+    if (size == 0)
+        return 0; /* broken */
+
+    last = get_version_context(contextstatsmem);
+ 
+    if (last != actual)
+        return last;
+    
+    return (0);
+}
+
+static const struct context_storage_method context_storage = {
+    loc_read_context,
+    loc_get_ids_used_context,
+    loc_get_max_size_context,
+    loc_lock_contexts,
+    loc_unlock_contexts, 
+    loc_context_need_update
+};
+
+const struct context_storage_method *get_context_storage() {
+    return &context_storage;
+}
+
+/*
+ * routines for the balancer_storage_method
+ */
+balancerinfo_t *loc_search_balancer(balancerinfo_t *balancer) {
+    return (read_balancer(balancerstatsmem, balancer));
+}
+
+static ngx_int_t loc_read_balancer(int ids, balancerinfo_t **balancer) {
+    return (get_balancer(balancerstatsmem, balancer, ids));
+}
+
+static int loc_get_ids_used_balancer(int *ids) {
+    return (get_ids_used_balancer(balancerstatsmem, ids));
+}
+
+static const struct balancer_storage_method balancer_storage = {
+    loc_read_balancer,
+    loc_get_ids_used_balancer,
+    loc_get_max_size_balancer
+};
+
+const struct balancer_storage_method *get_balancer_storage() {
+    return &balancer_storage;
+}
+
+/*
+ * routines for the sessionid_storage_method
+ */
+static ngx_int_t loc_read_sessionid(int ids, sessionidinfo_t **sessionid) {
+    return (get_sessionid(sessionidstatsmem, sessionid, ids));
+}
+
+static int loc_get_ids_used_sessionid(int *ids) {
+    return (get_ids_used_sessionid(sessionidstatsmem, ids));
+}
+
+static ngx_int_t loc_remove_sessionid(sessionidinfo_t *sessionid) {
+    return (remove_sessionid(sessionidstatsmem, sessionid));
+}
+
+static ngx_int_t loc_insert_update_sessionid(sessionidinfo_t *sessionid) {
+    return (insert_update_sessionid(sessionidstatsmem, sessionid));
+}
+
+const struct sessionid_storage_method sessionid_storage = {
+    loc_read_sessionid,
+    loc_get_ids_used_sessionid,
+    loc_get_max_size_sessionid,
+    loc_remove_sessionid,
+    loc_insert_update_sessionid
+};
+
+const struct sessionid_storage_method *get_sessionid_storage() {
+    return &sessionid_storage;
 }
 
 static void cleanup_manager(void *param) {
@@ -2657,6 +2835,59 @@ static ngx_int_t ngx_http_manager_postconfiguration(ngx_conf_t *cf) {
     return NGX_OK;
 }
 
+static void remove_workers_nodes() {
+
+}
+
+static void remove_removed_node() {
+    
+}
+
+static void remove_timeout_sessionid() {
+
+    int id[DEFMAXCONTEXT], size, i;
+    time_t now;
+
+    now = time(NULL);
+
+    /* read the ident of the sessionid */
+    size = sessionid_storage.get_max_size_sessionid();
+    if (size == 0)
+        return;
+    
+    size = sessionid_storage.get_ids_used_sessionid(id);
+
+    /* update lbstatus if needed */
+    for (i = 0; i < size; i++) {
+        sessionidinfo_t *ou;
+        if (sessionid_storage.read_sessionid(id[i], &ou) != NGX_OK)
+            continue;
+        if (ou->updatetime < (now - TIMESESSIONID)) {
+            /* Remove it */
+            sessionid_storage.remove_sessionid(ou);
+        }
+    }
+}
+
+static void ngx_clean_timer_handler(ngx_event_t *ev) {    
+    //mod_manager_config *mconf = ev->data;
+    
+    /* removed nodes: check for workers */
+    remove_workers_nodes();
+    
+    /* cleanup removed node in shared memory */
+    remove_removed_node();
+    
+    /* Free sessionid slots */
+    if (sessionid_storage.get_max_size_sessionid() > 0)
+        remove_timeout_sessionid();
+        
+    if (ngx_exiting) {
+        return;
+    }
+    ngx_add_timer(ev, 10000);
+}
+
 /*
  * Initialize Shared Memory 
  */
@@ -2779,9 +3010,21 @@ static ngx_int_t ngx_http_manager_module_init(ngx_cycle_t *cycle) {
  * Create the mutex of the insert/remove logic
  */
 static ngx_int_t ngx_http_manager_child_init(ngx_cycle_t *cycle) {
+    mod_manager_config *mconf = NULL;
+
+    if (ngx_get_conf(cycle->conf_ctx, ngx_http_module)) {
+        ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *) ngx_get_conf(cycle->conf_ctx, ngx_http_module);
+        mconf = ngx_http_get_module_srv_conf(ctx, ngx_http_manager_module);
+    }
+
+    if (mconf) {
+        mconf->clean_timer->log = ngx_cycle->log;
+        mconf->clean_timer->handler = ngx_clean_timer_handler;
+        mconf->clean_timer->data = mconf;
+        ngx_add_timer(mconf->clean_timer, (ngx_msec_t) 10000);
+    }
     return sharedmem_initialize_child(cycle->pool);
 }
-
 
 ngx_int_t ngx_http_upstream_init_fair(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us);
 
@@ -2885,158 +3128,10 @@ static void *ngx_http_module_manager_create_manager_config(ngx_conf_t *cf) {
         mconf->plcf[i] = plcf;
     }
 
+    mconf->clean_timer = ngx_pcalloc(cf->pool, sizeof (ngx_event_t));
+    if (mconf->clean_timer == NULL) {    
+        return NGX_CONF_ERROR;
+    }
+
     return mconf;
-}
-
-/*
- * routines for the host_storage_method
- */
-static ngx_int_t loc_read_host(int ids, hostinfo_t **host) {
-    return (get_host(hoststatsmem, host, ids));
-}
-
-static int loc_get_ids_used_host(int *ids) {
-    return (get_ids_used_host(hoststatsmem, ids));
-}
-static const struct host_storage_method host_storage = {
-    loc_read_host,
-    loc_get_ids_used_host,
-    loc_get_max_size_host
-};
-
-const struct host_storage_method *get_host_storage() {
-    return &host_storage;
-}
-
-/* Check is the nodes (in shared memory) were modified since last
- * call to worker_nodes_are_updated().
- * return codes:
- *   0 : No update of the nodes since last time.
- *   x: The version has changed the local table need to be updated.
- */
-static unsigned int loc_worker_nodes_need_update(void *data, ngx_pool_t *pool) {
-    int size;
-    unsigned int last = 0;
-
-    size = loc_get_max_size_node();
-    if (size == 0)
-        return 0; /* broken */
-
-    last = get_version_node(nodestatsmem);
-
-    return (0);
-}
-
-/* Store the last version update in the proccess config */
-static int loc_worker_nodes_are_updated(void *data, unsigned int last) {
-    //mod_manager_config *mconf = ap_get_module_config(s->module_config, &manager_module);
-    //mconf->tableversion = last;
-    return (0);
-}
-
-static ngx_int_t loc_remove_node(nodeinfo_t *node) {
-    return (remove_node(nodestatsmem, node));
-}
-
-static ngx_int_t loc_find_node(nodeinfo_t **node, const u_char *route) {
-    return (find_node(nodestatsmem, node, route));
-}
-
-static const struct node_storage_method node_storage = {
-    loc_read_node,
-    loc_get_ids_used_node,
-    loc_get_max_size_node,
-    loc_worker_nodes_need_update,
-    loc_worker_nodes_are_updated,
-    loc_remove_node,
-    loc_find_node,
-    loc_remove_host_context,
-};
-
-const struct node_storage_method *get_node_storage() {
-    return &node_storage;
-}
-
-/*
- * routines for the context_storage_method
- */
-static ngx_int_t loc_read_context(int ids, contextinfo_t **context) {
-    return (get_context(contextstatsmem, context, ids));
-}
-
-static int loc_get_ids_used_context(int *ids) {
-    return (get_ids_used_context(contextstatsmem, ids));
-}
-
-static void loc_lock_contexts() {
-    lock_contexts(contextstatsmem);
-}
-
-static void loc_unlock_contexts() {
-    unlock_contexts(contextstatsmem);
-}
-static const struct context_storage_method context_storage = {
-    loc_read_context,
-    loc_get_ids_used_context,
-    loc_get_max_size_context,
-    loc_lock_contexts,
-    loc_unlock_contexts
-};
-
-const struct context_storage_method *get_context_storage() {
-    return &context_storage;
-}
-
-/*
- * routines for the balancer_storage_method
- */
-balancerinfo_t *loc_search_balancer(balancerinfo_t *balancer) {
-    return (read_balancer(balancerstatsmem, balancer));
-}
-
-static ngx_int_t loc_read_balancer(int ids, balancerinfo_t **balancer) {
-    return (get_balancer(balancerstatsmem, balancer, ids));
-}
-
-static int loc_get_ids_used_balancer(int *ids) {
-    return (get_ids_used_balancer(balancerstatsmem, ids));
-}
-static const struct balancer_storage_method balancer_storage = {
-    loc_read_balancer,
-    loc_get_ids_used_balancer,
-    loc_get_max_size_balancer
-};
-
-const struct balancer_storage_method *get_balancer_storage() {
-    return &balancer_storage;
-}
-
-/*
- * routines for the sessionid_storage_method
- */
-static ngx_int_t loc_read_sessionid(int ids, sessionidinfo_t **sessionid) {
-    return (get_sessionid(sessionidstatsmem, sessionid, ids));
-}
-
-static int loc_get_ids_used_sessionid(int *ids) {
-    return (get_ids_used_sessionid(sessionidstatsmem, ids));
-}
-
-static ngx_int_t loc_remove_sessionid(sessionidinfo_t *sessionid) {
-    return (remove_sessionid(sessionidstatsmem, sessionid));
-}
-
-static ngx_int_t loc_insert_update_sessionid(sessionidinfo_t *sessionid) {
-    return (insert_update_sessionid(sessionidstatsmem, sessionid));
-}
-const struct sessionid_storage_method sessionid_storage = {
-    loc_read_sessionid,
-    loc_get_ids_used_sessionid,
-    loc_get_max_size_sessionid,
-    loc_remove_sessionid,
-    loc_insert_update_sessionid
-};
-
-const struct sessionid_storage_method *get_sessionid_storage() {
-    return &sessionid_storage;
 }

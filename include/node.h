@@ -196,11 +196,11 @@ int (*get_max_size_node)();
  * check the nodes for modifications.
  * XXX: void *data is server_rec *s in fact.
  */
-unsigned int (*worker_nodes_need_update)(void *data, ngx_pool_t *pool);
+unsigned int (*worker_nodes_need_update)(unsigned int actual);
 /*
  * mark that the worker node are now up to date.
  */
-int (*worker_nodes_are_updated)(void *data, unsigned int version);
+int (*worker_nodes_are_updated)(unsigned int version);
 /*
  * Remove the node from shared memory (free the slotmem)
  */

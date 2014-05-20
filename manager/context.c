@@ -240,6 +240,19 @@ int get_max_size_context(mem_t *s)
     return (s->storage->ap_slotmem_get_max_size(s->slotmem));
 }
 
+/*
+ * read the version of the table.
+ * @param pointer to the shared table.
+ * @return the version of the table
+ */
+unsigned int get_version_context(mem_t *s)
+{
+    if (s->storage == NULL)
+        return 0;
+    else
+        return (s->storage->ap_slotmem_get_version(s->slotmem));
+}
+
 /**
  * attach to the shared context table
  * @param name of an existing shared table.

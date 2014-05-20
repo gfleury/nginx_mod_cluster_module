@@ -17,6 +17,8 @@
 #define DEFMAXJGROUPSID  300
 #define MAXMESSSIZE     1024
 
+#define TIMESESSIONID   300
+
 /* Error messages */
 #define TYPESYNTAX 1
 #define SMESPAR "SYNTAX: Can't parse message"
@@ -142,7 +144,8 @@ typedef struct {
     ngx_str_t                      ssl_ciphers;
 #endif
    int max_peers_number;
-   time_t updatetime;
+   time_t updatetime;    
+   unsigned int tableversion;
 } ngx_http_proxy_loc_conf_t;
 
 
@@ -184,6 +187,7 @@ typedef struct mod_manager_config {
     /* Enable MCPM receiver */
     int enable_mcpm_receive;
     
+    ngx_event_t *clean_timer;
     
     ngx_http_proxy_loc_conf_t  *plcf[DEFMAXCONTEXT];
     

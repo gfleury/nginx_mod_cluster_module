@@ -1371,16 +1371,23 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
     }
         
     if (plcf) {
-    
-        if (balancer_info->updatetime > plcf->updatetime) {
+        int last = context_storage->context_need_update(plcf->tableversion);
+        if (last || balancer_info->updatetime > plcf->updatetime) {
             ngx_http_upstream_srv_conf_t *uscf = plcf->upstream.upstream;
             ngx_http_upstream_fair_peers_t *peers = uscf->peer.data;
             int next_free_peer = 0;
             
             ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "GREPTHIS - Need to update ProxyConfStruct from balancer: %d", balancer_info->id);
 
-            for (i = 0; i < node_table.sizenode; i++) {
-                nodeinfo_t *n = &node_table.node_info[i];
+            for (i = 0; i < context_table.sizecontext; i++) {
+                contextinfo_t *c = &context_table.context_info[i];    
+                ngx_uint_t context_hash = hash((u_char *) c->context) % DEFMAXCONTEXT;
+                if (c->status != ENABLED || context_hash != context_proxy_index)
+                    continue;
+                
+                nodeinfo_t *n;
+                if (node_storage->read_node(c->node, &n) != NGX_OK)
+                    continue;
                 if (ngx_strncmp(n->mess.balancer, balancer, len) == 0) {
                     ngx_url_t u;
                     uint j;
@@ -1420,6 +1427,7 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
             }
             peers->number = next_free_peer; 
             plcf->updatetime = time(NULL);
+            plcf->tableversion = last;
         } else {
             ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "GREPTHIS - Balancer OK: %d", balancer_info->id);
         }
@@ -1427,7 +1435,7 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
         /* Check if we have any session to sticky to */
 
         if (balancer_info->StickySession) {
-            u_char *p_sticky_start = ngx_pstrdup3(r->pool, balancer_info->StickySessionCookie);
+            u_char *p_sticky_start = balancer_info->StickySessionCookie;//ngx_pstrdup3(r->pool, balancer_info->StickySessionCookie);
             ngx_str_t session_sticky = {0, 0};
             ngx_str_t cookie = {0, 0};
             int sticky_len = 0;

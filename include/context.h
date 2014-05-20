@@ -126,6 +126,13 @@ int get_ids_used_context(mem_t *s, int *ids);
  */
 int get_max_size_context(mem_t *s);
 
+/*
+ * read the version of the table.
+ * @param pointer to the shared table.
+ * @return the version of the table
+ */
+unsigned int get_version_context(mem_t *s);
+
 /**
  * attach to the shared context table
  * @param name of an existing shared table.
@@ -173,6 +180,8 @@ void (*lock_contexts)();
  * unlock the context table
  */
 void (*unlock_contexts)();
+
+unsigned int (*context_need_update)(unsigned int actual);
 
 };
 #endif /*CONTEXT_H*/

@@ -70,4 +70,6 @@ Based on Mod_cluster by jfclere, https://github.com/modcluster/mod_cluster .
 
 Based on ngx-sticky-module by Jerome Loyet, https://code.google.com/p/nginx-sticky-module .
 
+Based on nginx-upstream-fair by Grzegorz Nosek, https://github.com/gnosek/nginx-upstream-fair . 
+
 This software is distributed under the terms of the FSF Lesser Gnu Public License (see [lgpl.txt](lgpl.txt)).
