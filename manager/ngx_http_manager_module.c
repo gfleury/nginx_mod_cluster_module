@@ -293,6 +293,40 @@ static int loc_get_max_size_jgroupsid() {
         return 0;
 }
 
+
+/*
+ * routines for the domain_storage_method
+ */
+static ngx_int_t loc_read_domain(int ids, domaininfo_t **domain) {
+    return (get_domain(domainstatsmem, domain, ids));
+}
+static int loc_get_ids_used_domain(int *ids) {
+    return(get_ids_used_domain(domainstatsmem, ids)); 
+}
+static int loc_get_max_size_domain() {
+    if (domainstatsmem)
+        return(get_max_size_domain(domainstatsmem));
+    else
+        return 0;
+}
+static ngx_int_t loc_remove_domain(domaininfo_t *domain) {
+    return (remove_domain(domainstatsmem, domain));
+}
+static ngx_int_t loc_insert_update_domain(domaininfo_t *domain) {
+    return (insert_update_domain(domainstatsmem, domain));
+}
+static ngx_int_t loc_find_domain(domaininfo_t **domain, const char *route, const char *balancer) {
+    return (find_domain(domainstatsmem, domain, route, balancer));
+}
+static const struct  domain_storage_method domain_storage = {
+    loc_read_domain,
+    loc_get_ids_used_domain,
+    loc_get_max_size_domain,
+    loc_remove_domain,
+    loc_insert_update_domain,
+    loc_find_domain
+};
+
 /*
  * routines for the host_storage_method
  */
@@ -356,14 +390,14 @@ static void loc_remove_host_context(int node, ngx_pool_t *pool) {
     /* for read the hosts */
     int i;
     int size = loc_get_max_size_host();
-    int *id;
+    int id[DEFMAXHOST];
     int sizecontext = loc_get_max_size_context();
-    int *idcontext;
+    int idcontext[DEFMAXCONTEXT];
 
     if (size == 0)
         return;
-    id = ngx_palloc(pool, sizeof (int) * size);
-    idcontext = ngx_palloc(pool, sizeof (int) * sizecontext);
+    //id = ngx_palloc(pool, sizeof (int) * size);
+    //idcontext = ngx_palloc(pool, sizeof (int) * sizecontext);
     size = get_ids_used_host(hoststatsmem, id);
     for (i = 0; i < size; i++) {
         hostinfo_t *ou;
@@ -965,15 +999,17 @@ static int is_same_node(nodeinfo_t *nodeinfo, nodeinfo_t *node) {
 void ngx_http_health_send_request(ngx_connection_t *c) {
     ssize_t size;
     ssize_t send_pos = 0;
-    ngx_http_upstream_health_status_t *respose_status = c->data;
+    ngx_http_upstream_health_status_t *response_status = c->data;
 
     do {
-        size = c->send(c, respose_status->request_data.data + send_pos, respose_status->request_data.len - send_pos);
+        size = c->send(c, response_status->request_data.data + send_pos, response_status->request_data.len - send_pos);
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0, "healthcheck: Send size %z", size);
         if (size == NGX_ERROR || size == 0) {
             // If the send fails, the connection is bad. Close it out
             ngx_close_connection(c);
             c = NULL;
+            response_status->response_code = size;
+            response_status->response_time = ngx_get_milli_time() - response_status->response_time;
             break;
         } else if (size == NGX_AGAIN) {
             // I guess this means return and try again later
@@ -981,13 +1017,15 @@ void ngx_http_health_send_request(ngx_connection_t *c) {
         } else {
             send_pos += size;
         }
-    } while (send_pos < (ssize_t) respose_status->request_data.len);
+    } while (send_pos < (ssize_t) response_status->request_data.len);
 
-    if (send_pos > (ssize_t) respose_status->request_data.len) {
-        ngx_log_error(NGX_LOG_WARN, c->log, 0, "healthcheck: Logic error. %z send pos bigger than buffer len %i", send_pos, respose_status->request_data.len);
-    } else if (send_pos == (ssize_t) respose_status->request_data.len) {
+    if (send_pos > (ssize_t) response_status->request_data.len) {
+        ngx_log_error(NGX_LOG_WARN, c->log, 0, "healthcheck: Logic error. %z send pos bigger than buffer len %i", send_pos, response_status->request_data.len);
+    } else if (send_pos == (ssize_t) response_status->request_data.len) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "healthcheck: Finished sending request");
     }
+    
+    
 }
 
 void ngx_http_health_write_handler(ngx_event_t *wev) {
@@ -1018,6 +1056,7 @@ void ngx_http_health_read_handler(ngx_event_t *rev) {
         size = c->recv(c, rb->pos, rb->end - rb->pos);
         ngx_log_debug2(NGX_LOG_DEBUG, rev->log, 0, "health: Recv size %z when I wanted %O", size, rb->end - rb->pos);
         if (size == NGX_ERROR) {
+            response_status->response_code = size;
             break;
         } else if (size == NGX_AGAIN) {
             break;
@@ -1029,7 +1068,15 @@ void ngx_http_health_read_handler(ngx_event_t *rev) {
         }
     } while (rb->pos < rb->end);
 
+    if (rb->pos != rb->start) {
+        if (!ngx_strncmp("HTTP", rb->start, 4)) {
+            response_status->response_code = ngx_atoi(rb->start + 9, 3);
+        } else {
+            response_status->response_code = NGX_NONE;
+        }
+    }
 
+    response_status->response_time = ngx_get_milli_time() - response_status->response_time;
 
     ngx_close_connection(c);
     c = NULL;
@@ -1041,6 +1088,8 @@ static ngx_int_t ngx_http_health_connect(ngx_http_request_t *r, struct sockaddr 
     ngx_peer_connection_t *pc;
     ngx_connection_t *c;
 
+    ngx_http_upstream_health_status_t *response_status = data;
+    
     pc = ngx_palloc(r->pool, sizeof (ngx_peer_connection_t));
 
     if (!pc)
@@ -1061,13 +1110,16 @@ static ngx_int_t ngx_http_health_connect(ngx_http_request_t *r, struct sockaddr 
     pc->cached = 0;
     pc->connection = NULL;
 
+    response_status->response_code = NGX_ERROR;
+    response_status->response_time = ngx_get_milli_time();
     rc = ngx_event_connect_peer(pc);
     if (rc == NGX_ERROR || rc == NGX_BUSY || rc == NGX_DECLINED) {
         ngx_log_error(NGX_LOG_CRIT, r->connection->log, 0, "health: Could not connect to peer: %i", rc);
         if (pc->connection) {
             ngx_close_connection(pc->connection);
         }
-
+        response_status->response_time = ngx_get_milli_time() - response_status->response_time;
+        response_status->response_code = rc;
         return NGX_ERROR;
     }
 
@@ -2612,8 +2664,12 @@ static void ngx_http_manager_body_handler(ngx_http_request_t *r) {
         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
         return;
     }
-    if (ngx_strstr(r->uri_start, NODE_COMMAND))
+     
+    int i = (u_char * )ngx_strstr (r->uri_start, " ") - r->uri_start;
+    if (ngx_strcmp(r->uri_start, "*") == 0 || (i >= 2 && r->uri_start[i - 1] == '*' && r->uri_start[i - 2] == '/')) {
         global = 1;
+    }
+    
 
     if (ngx_strncasecmp(r->method_name.data, (u_char *) "CONFIG", r->method_name.len) == 0)
         errstring = process_config(r, ptr, &errtype);
@@ -2681,7 +2737,7 @@ static ngx_int_t ngx_http_manager_handler(ngx_http_request_t *r) {
         ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "Here we should pass to proxy, and their upstreams");
         return ngx_http_proxy_manager_handler(r);
     }
-
+    
     status = ngx_http_read_client_request_body(r, ngx_http_manager_body_handler);
 
     if (status >= NGX_HTTP_SPECIAL_RESPONSE) {
@@ -2835,12 +2891,62 @@ static ngx_int_t ngx_http_manager_postconfiguration(ngx_conf_t *cf) {
     return NGX_OK;
 }
 
-static void remove_workers_nodes() {
+/*
+ * remove the domain that have timeout
+ */
+static void remove_timeout_domain() {
+    int id[DEFMAXHOST], size, i;
+    time_t now;
 
+    now = time(NULL);
+
+    /* read the ident of the domain */
+    size = domain_storage.get_max_size_domain();
+    if (size == 0)
+        return;
+
+    size = domain_storage.get_ids_used_domain(id);
+
+    for (i=0; i<size; i++) {
+        domaininfo_t *ou;
+        if (domain_storage.read_domain(id[i], &ou) != NGX_OK)
+            continue;
+        if (ou->updatetime < (now - TIMEDOMAIN)) {
+            /* Remove it */
+            domain_storage.remove_domain(ou);
+        } 
+    } 
 }
 
-static void remove_removed_node() {
-    
+static void remove_removed_nodes() {
+   int id[DEFMAXHOST], size, i;
+
+    /* read the ident of the nodes */
+    size = node_storage.get_max_size_node();
+    if (size == 0) {
+        return;
+    }
+    size = node_storage.get_ids_used_node(id);
+    for (i = 0; i < size; i++) {
+        nodeinfo_t *ou;
+        if (node_storage.read_node(id[i], &ou) != NGX_OK)
+            continue;
+        if (ou->mess.remove) {
+             if (ou->mess.Domain[0] != '\0') {
+                domaininfo_t dom;
+                ngx_memcpy(dom.JVMRoute, ou->mess.JVMRoute, ngx_strlen(ou->mess.JVMRoute));
+                ngx_memcpy(dom.balancer, ou->mess.balancer, ngx_strlen(ou->mess.balancer));
+                ngx_memcpy(dom.domain, ou->mess.Domain, ngx_strlen(ou->mess.Domain));
+                if (domain_storage.insert_update_domain(&dom) != NGX_OK) {
+                    remove_timeout_domain();
+                    domain_storage.insert_update_domain(&dom);
+                }
+            }            
+             /* remove the node from the shared memory */
+            node_storage.remove_host_context(ou->mess.id, NULL);
+            node_storage.remove_node(ou);
+        }
+    }
 }
 
 static void remove_timeout_sessionid() {
@@ -2869,14 +2975,39 @@ static void remove_timeout_sessionid() {
     }
 }
 
+static void check_nodes() {
+    int id[DEFMAXHOST], size, i;
+    time_t now;
+
+    now = time(NULL);
+
+    /* read the ident of the nodes */
+    size = node_storage.get_max_size_node();
+    if (size == 0)
+        return;
+    
+    size = node_storage.get_ids_used_node(id);
+
+    /* update lbstatus if needed */
+    for (i=0; i<size; i++) {
+        nodeinfo_t *ou;
+        if (node_storage.read_node(id[i], &ou) != NGX_OK)
+            continue;
+        if (ou->mess.remove)
+            continue;
+        /* Test for broken nodes */
+        
+    }
+}
+
 static void ngx_clean_timer_handler(ngx_event_t *ev) {    
     //mod_manager_config *mconf = ev->data;
     
-    /* removed nodes: check for workers */
-    remove_workers_nodes();
+    check_nodes();
     
-    /* cleanup removed node in shared memory */
-    remove_removed_node();
+    /* removed nodes: check for workers */
+    remove_removed_nodes();
+   
     
     /* Free sessionid slots */
     if (sessionid_storage.get_max_size_sessionid() > 0)

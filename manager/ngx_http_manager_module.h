@@ -18,6 +18,7 @@
 #define MAXMESSSIZE     1024
 
 #define TIMESESSIONID   300
+#define TIMEDOMAIN    300                    /* after 5 minutes the sessionid have probably timeout */
 
 /* Error messages */
 #define TYPESYNTAX 1
@@ -56,9 +57,6 @@
 
 /* Protocol version supported */
 #define VERSION_PROTOCOL "0.2.1"
-
-/* Internal substitution for node commands */
-#define NODE_COMMAND "/NODE_COMMAND"
 
 /* range of the commands */
 #define RANGECONTEXT 0

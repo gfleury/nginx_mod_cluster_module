@@ -239,4 +239,6 @@ ngx_int_t ngx_http_parse_header_inside_value(ngx_table_elt_t *h, ngx_str_t *name
 
 unsigned long hash(const u_char *str);
 
+double ngx_get_milli_time();
+
 #endif

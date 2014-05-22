@@ -63,7 +63,7 @@ typedef struct nodemess nodemess_t;
 
 typedef struct {
     ngx_uint_t response_size;
-    time_t response_time;    
+    double response_time;    
     ngx_uint_t response_code;
     ngx_str_t request_data;
     ngx_buf_t response_buffer;

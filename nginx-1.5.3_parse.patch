@@ -1,0 +1,13 @@
+diff -ur nginx-1.5.13/src/http/ngx_http_parse.c a/nginx-1.5.13/src/http/ngx_http_parse.c
+--- nginx-1.5.13/src/http/ngx_http_parse.c	2014-04-29 02:03:11.109000013 -0300
++++ a/nginx-1.5.13/src/http/ngx_http_parse.c	2014-04-08 11:15:23.000000000 -0300
+@@ -270,7 +270,7 @@
+                 break;
+             }
+ 
+-            if ((ch < 'A' || ch > 'Z') && ch != '_' && ch != '-') {
++            if ((ch < 'A' || ch > 'Z') && ch != '_') {
+                 return NGX_HTTP_PARSE_INVALID_METHOD;
+             }
+ 
+
