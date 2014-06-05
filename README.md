@@ -13,17 +13,13 @@ configuration of nginx upstreams. Porting the node side of mod_cluster to other 
 Status
 ======
 
-Still in development. Lot of hard coded and PoC code. 
+Pre-production ready, using for test and development environments 
 
 Todo:
 
 	- Add support to AJP using https://github.com/yaoweibin/nginx_ajp_module.
 
 	- Sticky session based on URL param
-
-	- Handle upstream weight based on MCMP Load param
-
-	- Node remove when connection fails
 
 	- Test all working and non working features
 
@@ -35,12 +31,20 @@ Features working:
 
 	- Sticky session based on cookie param
 
+	- Handle upstream weight based on MCMP Load param
 
+	- Node remove when connection fails
+
+	- Enable/Disable/Stop Contexts using ModManagerInfo interface
 
 Usage
 =====
 
 Installation:
+
+ - Apply nginx patch to allow MCMP methods
+
+# patch < nginx-1.5.3_parse.patch
 
 ./configure --with-cc-opt=-O  --add-module=/path/to/nginx_mod_cluster_module/advertise/ --add-module=/path/to/nginx_mod_cluster_module/manager/
 
