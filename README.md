@@ -46,7 +46,7 @@ Installation:
 
 patch < nginx-1.5.3_parse.patch
 
-./configure --with-cc-opt=-O  --add-module=/path/to/nginx_mod_cluster_module/advertise/ --add-module=/path/to/nginx_mod_cluster_module/manager/
+./configure --add-module=/path/to/nginx_mod_cluster_module/advertise/ --add-module=/path/to/nginx_mod_cluster_module/manager/
 
 Configuration:
 
