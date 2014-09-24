@@ -811,8 +811,7 @@ char *ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *p
     if (conf->upstream.max_temp_file_size_conf == NGX_CONF_UNSET_SIZE) {
         conf->upstream.max_temp_file_size = 1024 * 1024 * 1024;
     } else {
-        conf->upstream.max_temp_file_size =
-                                        conf->upstream.max_temp_file_size_conf;
+        conf->upstream.max_temp_file_size = conf->upstream.max_temp_file_size_conf;
     }
 
     if (conf->upstream.max_temp_file_size != 0
