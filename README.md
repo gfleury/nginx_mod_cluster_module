@@ -2,7 +2,7 @@
 Name
 ====
 
-**nginx_mod_cluster_module** -  Implementation of features mod_cluster to nginx, based on the original mod_cluster. 
+**nginx_mod_cluster_module** -  Implementation of features mod_cluster to nginx, based on the original mod_cluster. Can be used to dynamic config routes/paths on nginx. A replacer for hipache. 
 
 Description
 ===========
