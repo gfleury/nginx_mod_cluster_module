@@ -1193,7 +1193,7 @@ static node_context *find_node_context_host(ngx_http_request_t *r, const char *r
     int *contexts;
     int *length;
     int *status;
-    int i, j, max;
+    int i, j, max=0;
     node_context *best;
     int nbest;
     const u_char *uri = NULL;

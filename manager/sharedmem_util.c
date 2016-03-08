@@ -361,21 +361,21 @@ static ngx_int_t ap_slotmem_init(ap_slotmem_t **new, const u_char *name, size_t 
     u_char *ptr;
     struct sharedslotdesc desc, *new_desc;
     ap_slotmem_t *res;
-    const u_char *fname;
-    size_t nbytes;
+    //const u_char *fname;
+    //size_t nbytes;
     int i, *ident;
     size_t dsize = NGX_ALIGN_DEFAULT(sizeof(desc));
     size_t tsize = NGX_ALIGN_DEFAULT(sizeof(int) * (item_num + 1));
 
     item_size = NGX_ALIGN_DEFAULT(item_size);
-    nbytes = item_size * item_num + tsize + dsize;
+    //nbytes = item_size * item_num + tsize + dsize;
     if (globalpool == NULL)
         return ENOSHMAVAIL;
-    if (name) {
-        fname = name;
-    } else {
-        fname = (u_char *)"anonymous";
-    }
+    //if (name) {
+    //    fname = name;
+    //} else {
+    //    fname = (u_char *)"anonymous";
+    //}
 
     res = *new;
     

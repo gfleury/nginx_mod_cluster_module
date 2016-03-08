@@ -797,10 +797,10 @@ static ngx_int_t ngx_http_upstream_get_sticky_peer(ngx_peer_connection_t *pc, ng
             
             for (j = 0, n = fp->current; j < npeers; j++, n = (n + 1) % npeers) {
                 ngx_http_upstream_fair_peer_t *peer;
-                ngx_uint_t nreq;
+                //ngx_uint_t nreq;
 
                 peer = &fp->peers->peer[n];
-                nreq = fp->peers->peer[n].shared->nreq;
+                //nreq = fp->peers->peer[n].shared->nreq;
                 
                 if (!ngx_memcmp(peer->JVMRoute, si->JVMRoute, sizeof (si->JVMRoute))) {
                     ngx_log_error(NGX_LOG_DEBUG, pc->log, 0, "[upstream_fair] found sticky %s pointing to %s", si->sessionid, si->JVMRoute);

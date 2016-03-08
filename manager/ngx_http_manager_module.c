@@ -1045,7 +1045,7 @@ void ngx_http_health_read_handler(ngx_event_t *rev) {
     ngx_buf_t *rb;
     //    ngx_int_t rc;    
     ngx_http_upstream_health_status_t *response_status;
-    ngx_int_t expect_finished;
+    // ngx_int_t expect_finished;
 
     c = rev->data;
     response_status = c->data;
@@ -1061,7 +1061,7 @@ void ngx_http_health_read_handler(ngx_event_t *rev) {
         } else if (size == NGX_AGAIN) {
             break;
         } else if (size == 0) {
-            expect_finished = 1;
+        //    expect_finished = 1;
             break;
         } else {
             rb->pos += size;
@@ -1234,7 +1234,7 @@ static int ishost_up(ngx_http_request_t *r, u_char *scheme, u_char *host, u_char
     }
 
     if (u.naddrs > 0) {
-        ngx_http_upstream_health_status_t *response_status;
+        ngx_http_upstream_health_status_t *response_status = NULL;
         ngx_int_t addrs_idx = u.naddrs - 1;
         ngx_memcpy (nodeinfo.mess.Host, host, ngx_strlen(host));
         node = read_node(nodestatsmem, &nodeinfo);
@@ -2383,7 +2383,7 @@ static ngx_int_t ngx_http_manager_info_handler(ngx_http_request_t *r) {
 
     /* Advertise information */
     if (mconf->allow_display) {
-        if (advertise_info != NULL)
+        //if (advertise_info != NULL)
             advertise_info(r, b);
         ngx_bprintf(b, "end of \"httpd.conf\" configuration<br/><br/>");
     }
@@ -2615,7 +2615,7 @@ static void ngx_http_manager_body_handler(ngx_http_request_t *r) {
     u_char *errstring = NULL;
     int errtype = 0;
     u_char *buff = NULL;
-    size_t bufsiz = 0, maxbufsiz, len;
+    size_t bufsiz = 0, maxbufsiz;// len;
     ngx_chain_t *chain_buf = r->request_body->bufs;
     size_t bufpos = 0;
     int global = 0;
@@ -2645,7 +2645,7 @@ static void ngx_http_manager_body_handler(ngx_http_request_t *r) {
         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
     }
 
-    len = maxbufsiz;
+    //len = maxbufsiz;
 
     while (chain_buf && bufpos < maxbufsiz) {
         ngx_memcpy(buff + bufpos, chain_buf->buf->pos, chain_buf->buf->last - chain_buf->buf->pos);
@@ -2977,9 +2977,9 @@ static void remove_timeout_sessionid() {
 
 static void check_nodes() {
     int id[DEFMAXHOST], size, i;
-    time_t now;
+    //time_t now;
 
-    now = time(NULL);
+    //now = time(NULL);
 
     /* read the ident of the nodes */
     size = node_storage.get_max_size_node();
