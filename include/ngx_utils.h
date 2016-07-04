@@ -196,9 +196,9 @@ void fill_mip_v4(struct ip_mreq *mip, ngx_sockaddr_t *mcast, ngx_sockaddr_t *ifa
 
 ngx_int_t ngx_do_mcast_opt(int type, int sock, char value);
 
-ngx_int_t ngx_mcast_loopback(int *sock, char opt);
+ngx_int_t ngx_mcast_loopback(int sock, char opt);
 
-ngx_int_t ngx_mcast_hops(int *sock, char ttl);
+ngx_int_t ngx_mcast_hops(int sock, char ttl);
 
 ngx_int_t ngx_do_mcast(int type, int *sock, ngx_sockaddr_t *mcast, ngx_sockaddr_t *iface, ngx_sockaddr_t *source);
 
