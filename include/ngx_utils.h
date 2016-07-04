@@ -208,7 +208,7 @@ ngx_int_t ngx_mcast_leave(int *sock, ngx_sockaddr_t *mcast, ngx_sockaddr_t *ifac
 
 ngx_int_t ngx_socket_bind(int *sock, const ngx_sockaddr_t *addr);
 
-ngx_int_t ngx_socket_opt_set(int *sock, int flags, int value);
+ngx_int_t ngx_socket_opt_set(int sock, int flags, int value);
 
 ngx_int_t ngx_socket_create(int *sock, int family, int sock_type, int protocol);
 
