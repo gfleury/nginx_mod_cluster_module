@@ -1134,7 +1134,7 @@ ngx_http_upstream_init_fair_peer(ngx_http_request_t *r,
     r->upstream->peer.get = ngx_http_upstream_get_fair_peer;
     r->upstream->peer.free = ngx_http_upstream_free_fair_peer;
     r->upstream->peer.tries = usfp->number;
-#if (NGX_HTTP_SSL)
+#if (NNGX_HTTP_SSL)
     r->upstream->peer.set_session =
                                ngx_http_upstream_fair_set_session;
     r->upstream->peer.save_session =
