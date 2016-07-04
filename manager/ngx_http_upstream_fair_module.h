@@ -91,7 +91,7 @@ static ngx_chain_t *ngx_http_upstream_fair_report_status(ngx_http_request_t *r,
     ngx_int_t *length);
 #endif
 
-#if (NGX_HTTP_SSL)
+#if (NNGX_HTTP_SSL)
 static ngx_int_t ngx_http_upstream_fair_set_session(ngx_peer_connection_t *pc,
     void *data);
 static void ngx_http_upstream_fair_save_session(ngx_peer_connection_t *pc,

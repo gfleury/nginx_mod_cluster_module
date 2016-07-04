@@ -640,7 +640,8 @@ ngx_status_t ma_advertise_server(mod_advertise_config *mconf, int type) {
     ma_sequence++;
     if (ma_sequence < 1)
         ma_sequence = 1;
-    ngx_sprintf(buf, "%" NGX_INT64_T_FMT, ma_sequence);
+    i = ngx_sprintf(p, "%" NGX_INT64_T_FMT, ma_sequence) - p;
+    buf[i] = '\0';
     ngx_recent_rfc822_date(dat, time(NULL), RFC822_DATE_LEN);
     asl = ngx_get_status_line(ma_advertise_stat);
 
@@ -654,14 +655,14 @@ ngx_status_t ma_advertise_server(mod_advertise_config *mconf, int type) {
     ngx_md5_update(&md, magd->srvid + 1, ngx_strlen(magd->srvid) - 1);
     ngx_md5_final(msig, &md);
 
-    printf("Debug: %s %s %.*s\n", dat, buf, (int)(ngx_strlen(magd->srvid) - 1), magd->srvid + 1);
-
     /* Convert MD5 digest to hex string */
     for (i = 0; i < MD5_DIGESTSIZE; i++) {
         ssig[c++] = hex[msig[i] >> 4];
         ssig[c++] = hex[msig[i] & 0x0F];
     }
     ssig[c] = '\0';
+    printf("Debug: %s %s %.*s\n", dat, buf, (int)(ngx_strlen(magd->srvid) - 1), magd->srvid + 1, ssig);
+    
     pu = ngx_snprintf(p, l, MA_ADVERTISE_SERVER_FMT, asl, dat, ma_sequence, ssig, magd->srvid + 1);
     n = (pu - p);
     if (type == MA_ADVERTISE_SERVER) {
