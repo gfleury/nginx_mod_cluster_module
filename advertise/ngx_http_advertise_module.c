@@ -567,7 +567,13 @@ static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char 
                 "mod_advertise: ma_group_join apr_socket_create failed");
         return rv;
     }
-
+    
+    iaddr.s_addr = INADDR_ANY; // use DEFAULT interface
+  
+    // Set the outgoing interface to DEFAULT
+ 
+    setsockopt(ma_mgroup_socket, IPPROTO_IP, IP_MULTICAST_IF, &iaddr,
+              sizeof(struct in_addr));
     if ((rv = ngx_socket_opt_set(ma_mgroup_socket, SO_REUSEADDR, 1)) != NGX_OK) {
         ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
                 "mod_advertise: ma_group_join apr_socket_opt_set failed");
@@ -579,12 +585,6 @@ static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char 
                 "mod_advertise: ma_group_join apr_socket_bind failed");
         return rv;
     }
-    iaddr.s_addr = INADDR_ANY; // use DEFAULT interface
-  
-    // Set the outgoing interface to DEFAULT
- 
-    setsockopt(ma_mgroup_socket, IPPROTO_IP, IP_MULTICAST_IF, &iaddr,
-              sizeof(struct in_addr));
 
     if ((rv = ngx_mcast_join(&ma_mgroup_socket, &ma_mgroup_sa, &ma_niface_sa, NULL)) != NGX_OK) {
         ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
