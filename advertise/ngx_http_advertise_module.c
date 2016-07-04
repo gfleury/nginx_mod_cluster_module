@@ -591,7 +591,7 @@ static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char 
     setsockopt(ma_mgroup_socket, IPPROTO_IP, IP_MULTICAST_LOOP,
                        &one, sizeof(unsigned char));
 
-    /*if ((rv = ngx_mcast_join(&ma_mgroup_socket, &ma_mgroup_sa, &ma_niface_sa, NULL)) != NGX_OK) {
+    if ((rv = ngx_mcast_join(&ma_mgroup_socket, &ma_mgroup_sa, &ma_niface_sa, NULL)) != NGX_OK) {
         ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
                 "mod_advertise: ma_group_join apr_mcast_join failed");
 
@@ -601,7 +601,7 @@ static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char 
             close(ma_mgroup_socket);
             return rv;
         }
-    }*/
+    }
 
     if ((rv = ngx_mcast_hops(ma_mgroup_socket, MA_ADVERTISE_HOPS)) != NGX_OK) {
         ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
@@ -653,6 +653,9 @@ ngx_status_t ma_advertise_server(mod_advertise_config *mconf, int type) {
     ngx_md5_update(&md, buf, ngx_strlen(buf));
     ngx_md5_update(&md, magd->srvid + 1, ngx_strlen(magd->srvid) - 1);
     ngx_md5_final(msig, &md);
+
+    ngx_log_error(NGX_LOG_CRIT, mconf->log, 0, "Debug: %s %s %s", dat, buf, magd->srvid + 1);
+
     /* Convert MD5 digest to hex string */
     for (i = 0; i < MD5_DIGESTSIZE; i++) {
         ssig[c++] = hex[msig[i] >> 4];
