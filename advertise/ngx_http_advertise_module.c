@@ -654,7 +654,7 @@ ngx_status_t ma_advertise_server(mod_advertise_config *mconf, int type) {
     ngx_md5_update(&md, magd->srvid + 1, ngx_strlen(magd->srvid) - 1);
     ngx_md5_final(msig, &md);
 
-    printf("Debug: %s %s %.*s", dat, buf, ngx_strlen(magd->srvid) - 1, magd->srvid + 1);
+    printf("Debug: %s %s %.*s", dat, buf, (int)(ngx_strlen(magd->srvid) - 1), magd->srvid + 1);
 
     /* Convert MD5 digest to hex string */
     for (i = 0; i < MD5_DIGESTSIZE; i++) {
