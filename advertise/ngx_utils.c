@@ -783,15 +783,15 @@ int uuid_create(uuid_t *uuid) {
 
  ngx_int_t ngx_socket_opt_set(int sock, int flags, int value) {
 
-    int one, ret;
+    int one;
 
     if (value)
         one = 1;
     else
         one = 0;
 
-    if ((ret = setsockopt(sock, SOL_SOCKET, flags, (void *) &one, sizeof (int))) == -1) {
-        return ret;
+    if (setsockopt(sock, SOL_SOCKET, flags, (void *) &one, sizeof (int)) == -1) {
+        return errno;
     }
 
     return NGX_OK;

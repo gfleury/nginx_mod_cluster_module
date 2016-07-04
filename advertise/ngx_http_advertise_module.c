@@ -539,7 +539,8 @@ static void ma_group_leave() {
 
 static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char *bindaddr, ngx_int_t bindport, ngx_conf_t *cf) {
 
-    ngx_int_t rv;
+    ngx_int_t rv;   
+    struct in_addr iaddr;
     u_char *service = ngx_itoa(cf->pool, port);
     u_char *bind_service = ngx_itoa(cf->pool, bindport);
 
@@ -578,6 +579,12 @@ static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char 
                 "mod_advertise: ma_group_join apr_socket_bind failed");
         return rv;
     }
+    iaddr.s_addr = INADDR_ANY; // use DEFAULT interface
+  
+    // Set the outgoing interface to DEFAULT
+ 
+    setsockopt(sock, IPPROTO_IP, IP_MULTICAST_IF, &iaddr,
+              sizeof(struct in_addr));
 
     if ((rv = ngx_mcast_join(&ma_mgroup_socket, &ma_mgroup_sa, &ma_niface_sa, NULL)) != NGX_OK) {
         ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
