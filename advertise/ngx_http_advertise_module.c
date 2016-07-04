@@ -567,7 +567,7 @@ static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char 
         return rv;
     }
 
-    if ((rv = ngx_socket_opt_set(&ma_mgroup_socket, SO_REUSEADDR, 1)) != NGX_OK) {
+    if ((rv = ngx_socket_opt_set(ma_mgroup_socket, SO_REUSEADDR, 1)) != NGX_OK) {
         ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
                 "mod_advertise: ma_group_join apr_socket_opt_set failed");
         return rv;

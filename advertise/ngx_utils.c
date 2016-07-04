@@ -781,7 +781,7 @@ int uuid_create(uuid_t *uuid) {
     return NGX_OK;
 }
 
- ngx_int_t ngx_socket_opt_set(int *sock, int flags, int value) {
+ ngx_int_t ngx_socket_opt_set(int sock, int flags, int value) {
 
     int one;
 
@@ -790,7 +790,7 @@ int uuid_create(uuid_t *uuid) {
     else
         one = 0;
 
-    if (setsockopt(*sock, SOL_SOCKET, flags, (void *) &one, sizeof (int)) == -1) {
+    if (setsockopt(sock, SOL_SOCKET, flags, (void *) &one, sizeof (int)) == -1) {
         return errno;
     }
 
