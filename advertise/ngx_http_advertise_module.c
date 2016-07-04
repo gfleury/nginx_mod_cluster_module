@@ -588,7 +588,7 @@ static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char 
               sizeof(struct in_addr));
     
     // send multicast traffic to myself too
-    status = setsockopt(ma_mgroup_socket, IPPROTO_IP, IP_MULTICAST_LOOP,
+    setsockopt(ma_mgroup_socket, IPPROTO_IP, IP_MULTICAST_LOOP,
                        &one, sizeof(unsigned char));
 
     if ((rv = ngx_mcast_join(&ma_mgroup_socket, &ma_mgroup_sa, &ma_niface_sa, NULL)) != NGX_OK) {
