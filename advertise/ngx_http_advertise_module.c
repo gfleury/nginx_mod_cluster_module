@@ -661,7 +661,7 @@ ngx_status_t ma_advertise_server(mod_advertise_config *mconf, int type) {
         ssig[c++] = hex[msig[i] & 0x0F];
     }
     ssig[c] = '\0';
-    printf("Debug: %s %s %.*s\n", dat, buf, (int)(ngx_strlen(magd->srvid) - 1), magd->srvid + 1, ssig);
+    printf("Debug: %s %s %.*s %s\n", dat, buf, (int)(ngx_strlen(magd->srvid) - 1), magd->srvid + 1, ssig);
     
     pu = ngx_snprintf(p, l, MA_ADVERTISE_SERVER_FMT, asl, dat, ma_sequence, ssig, magd->srvid + 1);
     n = (pu - p);
