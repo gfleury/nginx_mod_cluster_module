@@ -662,7 +662,7 @@ ngx_status_t ma_advertise_server(mod_advertise_config *mconf, int type) {
         ssig[c++] = hex[msig[i] & 0x0F];
     }
     ssig[c] = '\0';
-    pu = ngx_snprintf(p, l, MA_ADVERTISE_SERVER_FMT, asl, dat, ma_sequence, ssig, "Salve");//magd->srvid + 1);
+    pu = ngx_snprintf(p, l, MA_ADVERTISE_SERVER_FMT, asl, dat, ma_sequence, ssig, magd->srvid + 1);
     n = (pu - p);
     if (type == MA_ADVERTISE_SERVER) {
         u_char *ma_advertise_srvs = mconf->ma_advertise_srvs;
