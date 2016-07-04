@@ -583,7 +583,7 @@ static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char 
   
     // Set the outgoing interface to DEFAULT
  
-    setsockopt(sock, IPPROTO_IP, IP_MULTICAST_IF, &iaddr,
+    setsockopt(ma_mgroup_socket, IPPROTO_IP, IP_MULTICAST_IF, &iaddr,
               sizeof(struct in_addr));
 
     if ((rv = ngx_mcast_join(&ma_mgroup_socket, &ma_mgroup_sa, &ma_niface_sa, NULL)) != NGX_OK) {
