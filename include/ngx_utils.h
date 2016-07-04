@@ -194,7 +194,7 @@ ngx_int_t ngx_socket_sendto(int socket, const ngx_sockaddr_t *addr, ngx_int_t fl
 
 void fill_mip_v4(struct ip_mreq *mip, ngx_sockaddr_t *mcast, ngx_sockaddr_t *iface);
 
-ngx_int_t ngx_do_mcast_opt(int type, int *sock, char value);
+ngx_int_t ngx_do_mcast_opt(int type, int sock, char value);
 
 ngx_int_t ngx_mcast_loopback(int *sock, char opt);
 

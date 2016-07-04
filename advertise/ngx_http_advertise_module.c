@@ -583,7 +583,7 @@ static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char 
         ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
                 "mod_advertise: ma_group_join apr_mcast_join failed");
 
-        if ((rv = ngx_mcast_loopback(&ma_mgroup_socket, 1)) != NGX_OK) {
+        if ((rv = ngx_mcast_loopback(ma_mgroup_socket, 1)) != NGX_OK) {
             ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
                     "mod_advertise: ma_group_join apr_mcast_loopback failed");
             close(ma_mgroup_socket);
@@ -591,7 +591,7 @@ static ngx_int_t ma_group_join(const u_char *addr, ngx_int_t port, const u_char 
         }
     }
 
-    if ((rv = ngx_mcast_hops(&ma_mgroup_socket, MA_ADVERTISE_HOPS)) != NGX_OK) {
+    if ((rv = ngx_mcast_hops(ma_mgroup_socket, MA_ADVERTISE_HOPS)) != NGX_OK) {
         ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
                 "mod_advertise: ma_group_join apr_mcast_hops failed");
         /* Due a bug in apr (fixed by r1309332) apr_mcast_hops may fail */

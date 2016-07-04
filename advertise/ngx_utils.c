@@ -706,21 +706,21 @@ int uuid_create(uuid_t *uuid) {
     }
 }
 
- ngx_int_t ngx_do_mcast_opt(int type, int *sock, char value) {
+ ngx_int_t ngx_do_mcast_opt(int type, int sock, char value) {
     ngx_int_t rv = NGX_OK;
 
-    if (setsockopt(*sock, IPPROTO_IP, type, (const void *) &value, sizeof (value)) == -1) {
+    if (setsockopt(sock, IPPROTO_IP, type, (const void *) &value, sizeof (value)) == -1) {
         rv = errno;
     }
 
     return rv;
 }
 
- ngx_int_t ngx_mcast_loopback(int *sock, char opt) {
+ ngx_int_t ngx_mcast_loopback(int sock, char opt) {
     return ngx_do_mcast_opt(IP_MULTICAST_LOOP, sock, opt);
 }
 
- ngx_int_t ngx_mcast_hops(int *sock, char ttl) {
+ ngx_int_t ngx_mcast_hops(int sock, char ttl) {
     return ngx_do_mcast_opt(IP_MULTICAST_TTL, sock, ttl);
 }
 
