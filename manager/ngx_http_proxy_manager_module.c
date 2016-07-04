@@ -291,7 +291,7 @@ static void ngx_http_proxy_set_vars(ngx_url_t *u, ngx_http_proxy_vars_t *v);
 
 
 
-#if (NGX_HTTP_SSL)
+#if (NNGX_HTTP_SSL)
 
 static ngx_conf_bitmask_t  ngx_http_proxy_ssl_protocols[] = {
     { ngx_string("SSLv2"), NGX_SSL_SSLv2 },
