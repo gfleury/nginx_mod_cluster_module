@@ -13,6 +13,8 @@ configuration of nginx upstreams. Porting the node side of mod_cluster to other 
 Status
 ======
 
+Lastest Nginx working version: nginx-release-1.6.3
+
 Pre-production ready, using for test and development environments 
 
 Todo:
