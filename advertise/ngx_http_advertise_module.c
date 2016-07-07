@@ -177,15 +177,16 @@ static char *ngx_http_advertise(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) 
     if (n_args >= 1)
         arg = &value[1];
 
-    if (n_args >= 2)
-        opt = &value[2];
-
     if (ngx_strcasecmp(arg->data, (u_char *) "Off") == 0)
         mconf->ma_advertise_mode = ma_advertise_off;
     else if (ngx_strcasecmp(arg->data, (u_char *) "On") == 0)
         mconf->ma_advertise_mode = ma_advertise_on;
     else
         return "ServerAdvertise must be Off or On";
+    
+    if (n_args >= 2)
+        opt = &value[2];
+
     if (opt) {
         const u_char *p = (u_char *) ngx_strstr(opt->data, "://");
         if (p) {
@@ -391,7 +392,7 @@ static void *ngx_http_advertise_create_conf(ngx_conf_t *cf) { // static void *cr
 
     mconf->ma_advertise_port = MA_DEFAULT_ADVPORT;
     mconf->ma_advertise_srvp = NGX_CONF_UNSET_UINT;
-    mconf->ma_advertise_mode = ma_advertise_on;
+    mconf->ma_advertise_mode = ma_advertise_off;
     mconf->ma_advertise_freq = MA_DEFAULT_ADV_FREQ;
 
     return mconf;
@@ -399,14 +400,44 @@ static void *ngx_http_advertise_create_conf(ngx_conf_t *cf) { // static void *cr
 }
 
 static char *ngx_http_advertise_merge_conf(ngx_conf_t *cf, void *parent, void *child) {
-    ngx_err_t rv;
-    ngx_pool_t *pproc = cf->pool;
-        
+   
     mod_advertise_config *mconf = parent; // Will keep vars
     mod_advertise_config *prev = child; // Has the configured vars
 
-//    mod_advertise_config *mconf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_advertise_module);
- 
+    if (prev->ma_advertise_mode == ma_advertise_on)
+        mconf->ma_advertise_mode = ma_advertise_on;
+        
+    ngx_conf_merge_uint_value(mconf->ma_advertise_freq, prev->ma_advertise_freq, MA_DEFAULT_ADV_FREQ);
+    ngx_conf_merge_uint_value(mconf->ma_advertise_port, prev->ma_advertise_port, MA_DEFAULT_ADVPORT);
+    ngx_conf_merge_uint_value(mconf->ma_advertise_srvp, prev->ma_advertise_srvp, 80);
+    ngx_conf_merge_uint_value(mconf->ma_bind_set, prev->ma_bind_set, NGX_CONF_UNSET_UINT);
+    ngx_conf_merge_uint_value(mconf->ma_bind_port, prev->ma_bind_port, NGX_CONF_UNSET_UINT);
+    
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_adrs, prev->ma_advertise_adrs, MA_DEFAULT_GROUP);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_adsi, prev->ma_advertise_adsi, NGX_CONF_UNSET_PTR);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvm, prev->ma_advertise_srvm, NGX_CONF_UNSET_PTR);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvh, prev->ma_advertise_srvh, NGX_CONF_UNSET_PTR);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvhostname, prev->ma_advertise_srvhostname, NGX_CONF_UNSET_PTR);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvs, prev->ma_advertise_srvs, NGX_CONF_UNSET_PTR);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvi, prev->ma_advertise_srvi, NGX_CONF_UNSET_PTR);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_uuid, prev->ma_advertise_uuid, NGX_CONF_UNSET_PTR);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_skey, prev->ma_advertise_skey, NGX_CONF_UNSET_PTR);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_uuid, prev->ma_advertise_uuid, NGX_CONF_UNSET_PTR);
+    ngx_conf_merge_ptr_value(mconf->ma_bind_adrs, prev->ma_bind_adrs, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_bind_adsi, prev->ma_bind_adsi, NGX_CONF_UNSET_PTR);
+    
+    return NGX_CONF_OK;
+}
+
+static void *parent_thread(void *data);
+
+static ngx_int_t ngx_http_advertise_post_config_hook(ngx_conf_t *cf) { //static void register_hooks(apr_pool_t *p)
+    ngx_err_t rv;
+    ngx_pool_t *pproc = cf->pool;
+        
+    mod_advertise_config *mconf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_advertise_module);
+    mod_advertise_config *prev = mconf;
+          
     ngx_http_core_srv_conf_t   **cscfp, *csfp = NULL;
     ngx_http_core_main_conf_t   *cmcf;
     
@@ -420,7 +451,7 @@ static char *ngx_http_advertise_merge_conf(ngx_conf_t *cf, void *parent, void *c
         
         smconf = cscfp[s]->ctx->srv_conf[ngx_http_advertise_module.ctx_index];
 
-        if (smconf == mconf || smconf == prev) {
+        if (smconf->ma_advertise_mode == ma_advertise_on) {
             csfp = cscfp[s];
             break;
         }
@@ -428,13 +459,13 @@ static char *ngx_http_advertise_merge_conf(ngx_conf_t *cf, void *parent, void *c
    
     if (!csfp) {
         ngx_log_error(NGX_LOG_CRIT, cf->log, 0, "mod_advertise: Unable to found mod_advertiser in any virtual host, trully bugged");    
-        return NGX_CONF_ERROR;
+        return NGX_ERROR;
     }
     
     if (!magd) {
         if (!(magd = ngx_pcalloc(pproc, sizeof (ma_global_data_t)))) {        
             ngx_log_error(NGX_LOG_CRIT, cf->log, 0, "mod_advertise: Unable to ngx_pcalloc magd struct");
-            return NGX_CONF_ERROR;
+            return NGX_ERROR;
         }
     }
 
@@ -460,6 +491,9 @@ static char *ngx_http_advertise_merge_conf(ngx_conf_t *cf, void *parent, void *c
     }
    
     if (prev->ma_advertise_srvhostname == NGX_CONF_UNSET_PTR) {
+        ngx_log_error(NGX_LOG_INFO, cf->log, 0,
+                    "mod_advertise: Falling back, SrvHostname Address was not informed using server_name %s",
+                    (*cscfp)->server_name.data);
         mconf->ma_advertise_srvhostname = ngx_pstrdup2(cf->pool, &(*cscfp)->server_name);
         mconf->ma_advertise_srvhostname[(*cscfp)->server_name.len] = '\0';
     }
@@ -477,7 +511,9 @@ static char *ngx_http_advertise_merge_conf(ngx_conf_t *cf, void *parent, void *c
             ptr = ngx_pstrdup(cf->pool, &(*cscfp)->server_name);
             ptr = ngx_pstrcat(cf->pool, ptr, port, NULL);
         }
-
+        ngx_log_error(NGX_LOG_INFO, cf->log, 0,
+                    "mod_advertise: Falling back, ServerAdvertise Address was not informed using server_name %s",
+                    ptr);
         rv = ngx_parse_addr_port(&mconf->ma_advertise_srvs,
                 &mconf->ma_advertise_srvi,
                 &mconf->ma_advertise_srvp,
@@ -487,33 +523,14 @@ static char *ngx_http_advertise_merge_conf(ngx_conf_t *cf, void *parent, void *c
             ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
                     "mod_advertise: Invalid ServerAdvertise Address %s",
                     ptr);
-            return NGX_CONF_ERROR;
+            return NGX_ERROR;
         }
     }
 
-    ngx_conf_merge_uint_value(mconf->ma_advertise_freq, prev->ma_advertise_freq, MA_DEFAULT_ADV_FREQ);
-    ngx_conf_merge_uint_value(mconf->ma_advertise_port, prev->ma_advertise_port, MA_DEFAULT_ADVPORT);
-    ngx_conf_merge_uint_value(mconf->ma_advertise_srvp, prev->ma_advertise_srvp, 80);
-    ngx_conf_merge_uint_value(mconf->ma_bind_set, prev->ma_bind_set, NGX_CONF_UNSET_UINT);
-    ngx_conf_merge_uint_value(mconf->ma_bind_port, prev->ma_bind_port, NGX_CONF_UNSET_UINT);
-    
-    ngx_conf_merge_ptr_value(mconf->ma_advertise_adrs, prev->ma_advertise_adrs, MA_DEFAULT_GROUP);
-    ngx_conf_merge_ptr_value(mconf->ma_advertise_adsi, prev->ma_advertise_adsi, NULL);
-    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvm, prev->ma_advertise_srvm, NULL);
-    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvh, prev->ma_advertise_srvh, NULL);
-    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvhostname, prev->ma_advertise_srvhostname, NULL);
-    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvs, prev->ma_advertise_srvs, NULL);
-    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvi, prev->ma_advertise_srvi, NULL);
-    ngx_conf_merge_ptr_value(mconf->ma_advertise_uuid, prev->ma_advertise_uuid, NULL);
-    ngx_conf_merge_ptr_value(mconf->ma_advertise_skey, prev->ma_advertise_skey, NULL);
-    ngx_conf_merge_ptr_value(mconf->ma_advertise_uuid, prev->ma_advertise_uuid, NULL);
-    ngx_conf_merge_ptr_value(mconf->ma_bind_adrs, prev->ma_bind_adrs, NULL);
-    ngx_conf_merge_ptr_value(mconf->ma_bind_adsi, prev->ma_bind_adsi, NULL);
-    
-    /* prevent X-Manager-Address: (null):0  */
+     /* prevent X-Manager-Address: (null):0  */
     if (mconf->ma_advertise_srvs == NGX_CONF_UNSET_PTR || mconf->ma_advertise_srvp == NGX_CONF_UNSET_UINT) {
         ngx_log_error(NGX_LOG_CRIT, cf->log, 0, "mod_advertise: ServerAdvertise Address or Port not defined, Advertise disabled!!!");
-        return NGX_CONF_OK;
+        return NGX_OK;
     }
 
      /* Check if we have advertise set */
@@ -529,13 +546,6 @@ static char *ngx_http_advertise_merge_conf(ngx_conf_t *cf, void *parent, void *c
         }
     }
 
-    
-    return NGX_CONF_OK;
-}
-
-static void *parent_thread(void *data);
-
-static ngx_int_t ngx_http_advertise_post_config_hook(ngx_conf_t *cf) { //static void register_hooks(apr_pool_t *p)
     return NGX_OK;
 }
 
