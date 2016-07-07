@@ -133,12 +133,17 @@ ngx_http_proxy_manager_host_variable(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    v->len = ctx->vars.host_header.len;
+    
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
-    v->data = ctx->vars.host_header.data;
-
+    if (ctx->vars.host_header.len) {
+        v->len = ctx->vars.host_header.len;
+        v->data = ctx->vars.host_header.data;
+    } else {
+        v->len = r->headers_in.host->value.len;
+        v->data = r->headers_in.host->value.data;
+    }
     return NGX_OK;
 }
 
@@ -1375,7 +1380,7 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
             ngx_http_upstream_srv_conf_t *uscf = plcf->upstream.upstream;
             ngx_http_upstream_fair_peers_t *peers = uscf->peer.data;
             int next_free_peer = 0;
-            
+
             ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "GREPTHIS - Need to update ProxyConfStruct from balancer: %d", balancer_info->id);
 
             for (i = 0; i < context_table.sizecontext; i++) {
@@ -1427,6 +1432,7 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
             peers->number = next_free_peer; 
             plcf->updatetime = time(NULL);
             plcf->tableversion = last;
+
         } else {
             ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "GREPTHIS - Balancer OK: %d", balancer_info->id);
         }
@@ -1472,7 +1478,18 @@ ngx_http_proxy_loc_conf_t  *ngx_http_get_proxy_conf(ngx_http_request_t *r, ngx_h
         ctx->plcf = plcf;
         ctx->balancer = balancer_info;
     }
+
+    ngx_str_t directupstream = {0, 0};
+    ngx_str_t directupstream_uri_param = ngx_string("directupstream");
+
+    ngx_http_arg(r, directupstream_uri_param.data, directupstream_uri_param.len, &directupstream);
     
+    if (directupstream.len > 0) {
+        ctx->direct_upstream = atoi((char *)directupstream.data);
+        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "[directupstream] got directupstream route=%V", &directupstream);
+    } else {
+        ctx->direct_upstream = 0;
+    }
     return (plcf);
 }
 

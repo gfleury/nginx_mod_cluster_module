@@ -32,7 +32,7 @@
 }
 
 
- ngx_int_t ngx_parse_addr_port(u_char **addr, u_char **scope_id, ngx_int_t *port, const u_char *str, ngx_pool_t *p) {
+ ngx_int_t ngx_parse_addr_port(u_char **addr, u_char **scope_id, ngx_uint_t *port, const u_char *str, ngx_pool_t *p) {
 
     const u_char *ch, *lastchar;
     int big_port;

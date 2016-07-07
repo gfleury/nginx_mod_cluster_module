@@ -848,6 +848,13 @@ ngx_http_upstream_choose_fair_peer(ngx_peer_connection_t *pc,
         return NGX_OK;
     }
     
+    /* Check for queryparam sticking to backend/upstream */
+    if (fp->ctx->direct_upstream != 0 && fp->ctx->direct_upstream < npeers) {
+        best_idx = fp->ctx->direct_upstream;
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0, "[upstream_fair] peer %i is directed by queryparam", best_idx);
+        goto chosen;
+    }
+    
     /* SEARCH FOR STICKY SESSIONS */
     best_idx = ngx_http_upstream_get_sticky_peer(pc, fp);
     if (best_idx != NGX_PEER_INVALID) {

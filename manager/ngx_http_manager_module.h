@@ -248,6 +248,7 @@ typedef struct {
     u_char                      sticky_data[SESSIONIDSZ];
     u_char                      JVMRoute[JVMROUTESZ];
     balancerinfo_t              *balancer;
+    ngx_uint_t                  direct_upstream;
 } ngx_http_proxy_ctx_t;
 
 balancerinfo_t *loc_search_balancer(balancerinfo_t *balancer);

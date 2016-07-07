@@ -22,7 +22,7 @@
 
 u_char *ngx_pstrndup(ngx_pool_t *pool, ngx_str_t *src, size_t n);
 
-ngx_int_t ngx_parse_addr_port(u_char **addr, u_char **scope_id, ngx_int_t *port, const u_char *str, ngx_pool_t *p);
+ngx_int_t ngx_parse_addr_port(u_char **addr, u_char **scope_id, ngx_uint_t *port, const u_char *str, ngx_pool_t *p);
 
 /*
  ** Company, Microsoft, or Digital Equipment Corporation be used in

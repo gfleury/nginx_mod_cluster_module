@@ -29,13 +29,13 @@ typedef struct mod_advertise_config {
 
     u_char *ma_advertise_skey;
 
-    ngx_int_t ma_bind_set;
+    ngx_uint_t ma_bind_set;
     u_char *ma_bind_adrs;
     u_char *ma_bind_adsi;
-    ngx_int_t ma_bind_port;
+    ngx_uint_t ma_bind_port;
 
-    ngx_int_t ma_advertise_port;
-    ngx_int_t ma_advertise_srvp;
+    ngx_uint_t ma_advertise_port;
+    ngx_uint_t ma_advertise_srvp;
     ma_advertise_e ma_advertise_mode;
     uint64_t ma_advertise_freq;
 } mod_advertise_config;
@@ -162,7 +162,7 @@ ngx_module_t ngx_http_advertise_module = {
 };
 
 static char *ngx_http_advertise(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
-    mod_advertise_config *mconf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_advertise_module);
+    mod_advertise_config *mconf = conf;//ngx_http_conf_get_module_srv_conf(cf, ngx_http_advertise_module);
 
     ngx_uint_t n_args = cf->args->nelts - 1;
 
@@ -171,7 +171,7 @@ static char *ngx_http_advertise(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) 
     ngx_str_t *arg = NULL, *opt = NULL;
 
 
-    if (mconf->ma_advertise_srvs)
+    if (mconf->ma_advertise_srvs != NGX_CONF_UNSET_PTR)
         return "Duplicate ServerAdvertise directives are not allowed";
 
     if (n_args >= 1)
@@ -187,7 +187,7 @@ static char *ngx_http_advertise(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) 
     else
         return "ServerAdvertise must be Off or On";
     if (opt) {
-        const u_char *p = (u_char *) ngx_strstr(opt, "://");
+        const u_char *p = (u_char *) ngx_strstr(opt->data, "://");
         if (p) {
             mconf->ma_advertise_srvm = ngx_pstrndup(cf->pool, opt, p - opt->data);
             opt->data = (u_char *) p + 3;
@@ -196,9 +196,9 @@ static char *ngx_http_advertise(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) 
                 &mconf->ma_advertise_srvi,
                 &mconf->ma_advertise_srvp,
                 opt->data, cf->pool) != NGX_OK ||
-                !mconf->ma_advertise_srvs ||
-                !mconf->ma_advertise_srvp)
-            return "Invalid ServerAdvertise Address";
+                mconf->ma_advertise_srvs == NGX_CONF_UNSET_PTR ||
+                mconf->ma_advertise_srvp == NGX_CONF_UNSET_UINT)
+            return "Invalid ServerAdvertise Address, you should input http://ip_address:port";
     }
 
 
@@ -229,9 +229,9 @@ static char *ngx_http_advertise_group(ngx_conf_t *cf, ngx_command_t *cmd, void *
             &mconf->ma_advertise_port,
             arg->data, cf->pool) != NGX_OK)
         return "Invalid AdvertiseGroup address";
-    if (!mconf->ma_advertise_adrs)
+    if (mconf->ma_advertise_adrs == NGX_CONF_UNSET_PTR)
         return "Missing Ip part from AdvertiseGroup address";
-    if (!mconf->ma_advertise_port)
+    if (mconf->ma_advertise_port == NGX_CONF_UNSET_UINT)
         mconf->ma_advertise_port = MA_DEFAULT_ADVPORT;
 
 
@@ -286,7 +286,7 @@ static char *ngx_http_advertise_seckey(ngx_conf_t *cf, ngx_command_t *cmd, void 
     ngx_str_t *arg = NULL;
 
 
-    if (mconf->ma_advertise_skey != NULL)
+    if (mconf->ma_advertise_skey != NGX_CONF_UNSET_PTR)
         return "Duplicate AdvertiseSecurityKey directives are not allowed";
 
     if (n_args >= 1)
@@ -311,7 +311,7 @@ static char *ngx_http_advertise_manageurl(ngx_conf_t *cf, ngx_command_t *cmd, vo
 
 
 
-    if (mconf->ma_advertise_srvh != NULL)
+    if (mconf->ma_advertise_srvh != NGX_CONF_UNSET_PTR)
         return "Duplicate AdvertiseManagerUrl directives are not allowed";
 
     if (n_args >= 1)
@@ -336,7 +336,7 @@ static char *ngx_http_advertise_bindaddr(ngx_conf_t *cf, ngx_command_t *cmd, voi
     ngx_str_t *arg = NULL;
 
 
-    if (mconf->ma_bind_set)
+    if (mconf->ma_bind_set != NGX_CONF_UNSET_UINT)
         return "Duplicate AdvertiseBindAddress directives are not allowed";
 
 
@@ -352,10 +352,10 @@ static char *ngx_http_advertise_bindaddr(ngx_conf_t *cf, ngx_command_t *cmd, voi
             arg->data, cf->pool) != NGX_OK)
         return "Invalid AdvertiseBindAddress address";
 
-    if (!mconf->ma_bind_adrs)
+    if (mconf->ma_bind_adrs == NGX_CONF_UNSET_PTR)
         return "Missing Ip part from AdvertiseBindAddress address";
 
-    if (!mconf->ma_bind_port)
+    if (mconf->ma_bind_port == NGX_CONF_UNSET_UINT)
         mconf->ma_bind_port = MA_DEFAULT_ADVPORT;
 
     mconf->ma_bind_set = 1;
@@ -374,23 +374,23 @@ static void *ngx_http_advertise_create_conf(ngx_conf_t *cf) { // static void *cr
 
     /* Set default values */
     mconf->ma_advertise_adrs = MA_DEFAULT_GROUP;
-    mconf->ma_advertise_adsi = NULL;
-    mconf->ma_advertise_srvm = NULL;
-    mconf->ma_advertise_srvh = NULL;
-    mconf->ma_advertise_srvs = NULL;
-    mconf->ma_advertise_srvi = NULL;
-    mconf->ma_advertise_uuid = NULL;
-    mconf->ma_advertise_srvhostname = NULL;
+    mconf->ma_advertise_adsi = NGX_CONF_UNSET_PTR;
+    mconf->ma_advertise_srvm = NGX_CONF_UNSET_PTR;
+    mconf->ma_advertise_srvh = NGX_CONF_UNSET_PTR;
+    mconf->ma_advertise_srvs = NGX_CONF_UNSET_PTR;
+    mconf->ma_advertise_srvi = NGX_CONF_UNSET_PTR;
+    mconf->ma_advertise_uuid = NGX_CONF_UNSET_PTR;
+    mconf->ma_advertise_srvhostname = NGX_CONF_UNSET_PTR;
 
-    mconf->ma_advertise_skey = NULL;
+    mconf->ma_advertise_skey = NGX_CONF_UNSET_PTR;
 
     mconf->ma_bind_set = 0;
-    mconf->ma_bind_adrs = NULL;
-    mconf->ma_bind_adsi = NULL;
+    mconf->ma_bind_adrs = NGX_CONF_UNSET_PTR;
+    mconf->ma_bind_adsi = NGX_CONF_UNSET_PTR;
     mconf->ma_bind_port = MA_DEFAULT_ADVPORT;
 
     mconf->ma_advertise_port = MA_DEFAULT_ADVPORT;
-    mconf->ma_advertise_srvp = 0;
+    mconf->ma_advertise_srvp = NGX_CONF_UNSET_UINT;
     mconf->ma_advertise_mode = ma_advertise_on;
     mconf->ma_advertise_freq = MA_DEFAULT_ADV_FREQ;
 
@@ -399,30 +399,49 @@ static void *ngx_http_advertise_create_conf(ngx_conf_t *cf) { // static void *cr
 }
 
 static char *ngx_http_advertise_merge_conf(ngx_conf_t *cf, void *parent, void *child) {
-    return NGX_CONF_OK;
-}
-
-static void *parent_thread(void *data);
-
-static ngx_int_t ngx_http_advertise_post_config_hook(ngx_conf_t *cf) { //static void register_hooks(apr_pool_t *p)
-
     ngx_err_t rv;
     ngx_pool_t *pproc = cf->pool;
+        
+    mod_advertise_config *mconf = parent; // Will keep vars
+    mod_advertise_config *prev = child; // Has the configured vars
 
-    mod_advertise_config *mconf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_advertise_module);
+//    mod_advertise_config *mconf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_advertise_module);
+ 
+    ngx_http_core_srv_conf_t   **cscfp, *csfp = NULL;
+    ngx_http_core_main_conf_t   *cmcf;
+    
+    ngx_uint_t s;
+    
+    cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
+    cscfp = cmcf->servers.elts;
+     
+    for (s = 0; s < cmcf->servers.nelts; s++) { 
+        mod_advertise_config *smconf;
+        
+        smconf = cscfp[s]->ctx->srv_conf[ngx_http_advertise_module.ctx_index];
 
-
+        if (smconf == mconf || smconf == prev) {
+            csfp = cscfp[s];
+            break;
+        }
+    }
+   
+    if (!csfp) {
+        ngx_log_error(NGX_LOG_CRIT, cf->log, 0, "mod_advertise: Unable to found mod_advertiser in any virtual host, trully bugged");    
+        return NGX_CONF_ERROR;
+    }
+    
     if (!magd) {
         if (!(magd = ngx_pcalloc(pproc, sizeof (ma_global_data_t)))) {        
             ngx_log_error(NGX_LOG_CRIT, cf->log, 0, "mod_advertise: Unable to ngx_pcalloc magd struct");
-            return NGX_ERROR;
+            return NGX_CONF_ERROR;
         }
     }
 
-    if (mconf->ma_advertise_skey) {
+    if (prev->ma_advertise_skey != NGX_CONF_UNSET_PTR) {
         ngx_md5_t mc;
         ngx_md5_init(&mc);
-        ngx_md5_update(&mc, mconf->ma_advertise_skey, ngx_strlen(mconf->ma_advertise_skey));
+        ngx_md5_update(&mc, prev->ma_advertise_skey, ngx_strlen(prev->ma_advertise_skey));
         ngx_md5_final(magd->ssalt, &mc);
     } else {
         /* If security key is not configured, the digest is calculated from zero bytes */
@@ -431,11 +450,75 @@ static ngx_int_t ngx_http_advertise_post_config_hook(ngx_conf_t *cf) { //static 
     uuid_create(&magd->suuid);
     magd->srvid[0] = '/';
     snpuid(&magd->srvid[1], sizeof (magd->srvid), magd->suuid);
-    if (!mconf->ma_advertise_srvh)
+    if (prev->ma_advertise_srvh == NGX_CONF_UNSET_PTR)
         mconf->ma_advertise_srvh = magd->srvid;
-    /* Check if we have advertise set */
+   
+    /* Fill default values */
+    if (prev->ma_advertise_srvm == NGX_CONF_UNSET_PTR) {
+        ngx_str_t t = ngx_string("http");
+        mconf->ma_advertise_srvm = ngx_pstrdup2(cf->pool, &t);
+    }
+   
+    if (prev->ma_advertise_srvhostname == NGX_CONF_UNSET_PTR) {
+        mconf->ma_advertise_srvhostname = ngx_pstrdup2(cf->pool, &(*cscfp)->server_name);
+        mconf->ma_advertise_srvhostname[(*cscfp)->server_name.len] = '\0';
+    }
+
+    if (prev->ma_advertise_srvs == NGX_CONF_UNSET_PTR && cf) {
+        /*
+         * That is not easy just use ServerAdvertise with the server parameter
+         * if the code below doesn't work
+         */
+        u_char *ptr = NULL;        
+        
+        if ((*cscfp)->server_name.data != NULL) {
+            u_char port[] = ":80";
+
+            ptr = ngx_pstrdup(cf->pool, &(*cscfp)->server_name);
+            ptr = ngx_pstrcat(cf->pool, ptr, port, NULL);
+        }
+
+        rv = ngx_parse_addr_port(&mconf->ma_advertise_srvs,
+                &mconf->ma_advertise_srvi,
+                &mconf->ma_advertise_srvp,
+                ptr, cf->pool);
+        if (rv != NGX_OK || mconf->ma_advertise_srvs == NGX_CONF_UNSET_PTR ||
+                mconf->ma_advertise_srvp == NGX_CONF_UNSET_UINT) {
+            ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
+                    "mod_advertise: Invalid ServerAdvertise Address %s",
+                    ptr);
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    ngx_conf_merge_uint_value(mconf->ma_advertise_freq, prev->ma_advertise_freq, MA_DEFAULT_ADV_FREQ);
+    ngx_conf_merge_uint_value(mconf->ma_advertise_port, prev->ma_advertise_port, MA_DEFAULT_ADVPORT);
+    ngx_conf_merge_uint_value(mconf->ma_advertise_srvp, prev->ma_advertise_srvp, 80);
+    ngx_conf_merge_uint_value(mconf->ma_bind_set, prev->ma_bind_set, NGX_CONF_UNSET_UINT);
+    ngx_conf_merge_uint_value(mconf->ma_bind_port, prev->ma_bind_port, NGX_CONF_UNSET_UINT);
+    
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_adrs, prev->ma_advertise_adrs, MA_DEFAULT_GROUP);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_adsi, prev->ma_advertise_adsi, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvm, prev->ma_advertise_srvm, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvh, prev->ma_advertise_srvh, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvhostname, prev->ma_advertise_srvhostname, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvs, prev->ma_advertise_srvs, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_srvi, prev->ma_advertise_srvi, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_uuid, prev->ma_advertise_uuid, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_skey, prev->ma_advertise_skey, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_advertise_uuid, prev->ma_advertise_uuid, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_bind_adrs, prev->ma_bind_adrs, NULL);
+    ngx_conf_merge_ptr_value(mconf->ma_bind_adsi, prev->ma_bind_adsi, NULL);
+    
+    /* prevent X-Manager-Address: (null):0  */
+    if (mconf->ma_advertise_srvs == NGX_CONF_UNSET_PTR || mconf->ma_advertise_srvp == NGX_CONF_UNSET_UINT) {
+        ngx_log_error(NGX_LOG_CRIT, cf->log, 0, "mod_advertise: ServerAdvertise Address or Port not defined, Advertise disabled!!!");
+        return NGX_CONF_OK;
+    }
+
+     /* Check if we have advertise set */
     if (mconf->ma_advertise_mode != ma_advertise_off &&
-            mconf->ma_advertise_adrs) {
+            mconf->ma_advertise_adrs != NGX_CONF_UNSET_PTR) {
         rv = ma_group_join(mconf->ma_advertise_adrs, mconf->ma_advertise_port, mconf->ma_bind_adrs, mconf->ma_bind_port, cf);
         if (rv != NGX_OK) {
             ngx_log_error(NGX_LOG_CRIT, cf->log, 0, "mod_advertise: multicast join failed for %s:%d.", mconf->ma_advertise_adrs, mconf->ma_advertise_port);
@@ -445,50 +528,14 @@ static ngx_int_t ngx_http_advertise_post_config_hook(ngx_conf_t *cf) { //static 
             ma_advertise_stat = 200;
         }
     }
-   
-    /* Fill default values */
-    if (!mconf->ma_advertise_srvm) {
-        ngx_str_t t = ngx_string("http");
-        mconf->ma_advertise_srvm = ngx_pstrdup2(cf->pool, &t);
-    }
-   
-    if (!mconf->ma_advertise_srvhostname) {
-        mconf->ma_advertise_srvhostname = ngx_pstrdup2(cf->pool, &cf->cycle->hostname);
-    }
 
-    if (mconf->ma_advertise_srvs == NULL && cf) {
-        /*
-         * That is not easy just use ServerAdvertise with the server parameter
-         * if the code below doesn't work
-         */
-        u_char *ptr = NULL;        
-        
-        if (cf->cycle->hostname.data != NULL) {
-            u_char port[] = ":80";
+    
+    return NGX_CONF_OK;
+}
 
-            ptr = ngx_pstrdup(cf->pool, &cf->cycle->hostname);
-            ptr = ngx_pstrcat(cf->pool, ptr, port, NULL);
-        }
+static void *parent_thread(void *data);
 
-        rv = ngx_parse_addr_port(&mconf->ma_advertise_srvs,
-                &mconf->ma_advertise_srvi,
-                &mconf->ma_advertise_srvp,
-                ptr, cf->pool);
-        if (rv != NGX_OK || !mconf->ma_advertise_srvs ||
-                !mconf->ma_advertise_srvp) {
-            ngx_log_error(NGX_LOG_CRIT, cf->log, 0,
-                    "mod_advertise: Invalid ServerAdvertise Address %s",
-                    ptr);
-            return rv;
-        }
-    }
-
-    /* prevent X-Manager-Address: (null):0  */
-    if (!mconf->ma_advertise_srvs || !mconf->ma_advertise_srvp) {
-        ngx_log_error(NGX_LOG_CRIT, cf->log, 0, "mod_advertise: ServerAdvertise Address or Port not defined, Advertise disabled!!!");
-        return NGX_OK;
-    }
-
+static ngx_int_t ngx_http_advertise_post_config_hook(ngx_conf_t *cf) { //static void register_hooks(apr_pool_t *p)
     return NGX_OK;
 }
 
