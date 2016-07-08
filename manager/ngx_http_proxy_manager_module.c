@@ -1512,7 +1512,9 @@ ngx_int_t ngx_http_proxy_manager_handler(ngx_http_request_t *r) {
     plcf = ngx_http_get_proxy_conf(r, ctx);    
     
     if (plcf == NULL) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        /* Cannot find registered context 
+           return and proceed to normal nginx process */
+        return NGX_DECLINED;
     }
     
     ngx_http_set_ctx(r, ctx, ngx_http_manager_module);
