@@ -214,7 +214,7 @@ static char *ngx_cmd_manager_mcpm_receive_enable(ngx_conf_t *cf, ngx_command_t *
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "ngx_http_proxy_merge_loc_conf failed");
             return NGX_CONF_ERROR;
         }
-
+        plcf->http_version = NGX_HTTP_VERSION_11;
     }
 
     return NGX_CONF_OK;
