@@ -1017,7 +1017,7 @@ char *ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *p
 #endif
 
     ngx_conf_merge_uint_value(conf->http_version, prev->http_version,
-                              NGX_HTTP_VERSION_10);
+                              NGX_HTTP_VERSION_11);
 
     ngx_conf_merge_uint_value(conf->headers_hash_max_size,
                               prev->headers_hash_max_size, 512);
