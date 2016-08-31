@@ -15,17 +15,17 @@ Status
 
 Lastest Nginx working version: nginx-release-1.6.3
 
-Pre-production ready, using for test and development environments 
+Production ready, being used in production environments 
 
 Todo:
 
-	- Add support to AJP using https://github.com/yaoweibin/nginx_ajp_module.
+	- Add support to AJP using https://github.com/yaoweibin/nginx_ajp_module. (probably never will do it)
 
 	- Sticky session based on URL param
 
-	- Test all working and non working features
-
 Features working:
+
+	- Websocket proxying support, allows use of websockets endpoints
 
 	- Node/upstream dynamic configuration
 
