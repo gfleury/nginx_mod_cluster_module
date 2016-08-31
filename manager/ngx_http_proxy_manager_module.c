@@ -69,12 +69,12 @@ ngx_int_t ngx_http_proxy_manager_handler(ngx_http_request_t *r);
 
 static ngx_keyval_t  ngx_http_proxy_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_manager_host") },
-    { ngx_string("Connection"), ngx_string("close") },
+    { ngx_string("Connection"), ngx_string("$proxy_manager_connection") }, 
     { ngx_string("Content-Length"), ngx_string("$proxy_manager_internal_body_length") },
     { ngx_string("Transfer-Encoding"), ngx_string("") },
     { ngx_string("Keep-Alive"), ngx_string("") },
     { ngx_string("Expect"), ngx_string("") },
-    { ngx_string("Upgrade"), ngx_string("") },
+    { ngx_string("Upgrade"), ngx_string("$proxy_manager_upgrade") },
     { ngx_null_string, ngx_null_string }
 };
 
@@ -96,7 +96,7 @@ static ngx_str_t  ngx_http_proxy_hide_headers[] = {
 
 static ngx_keyval_t  ngx_http_proxy_cache_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_manager_host") },
-    { ngx_string("Connection"), ngx_string("close") },
+    { ngx_string("Connection"), ngx_string("$proxy_manager_connection") },
     { ngx_string("Content-Length"), ngx_string("$proxy_manager_internal_body_length") },
     { ngx_string("Transfer-Encoding"), ngx_string("") },
     { ngx_string("Keep-Alive"), ngx_string("") },
@@ -247,6 +247,68 @@ ngx_http_proxy_manager_internal_body_length_variable(ngx_http_request_t *r,
     return NGX_OK;
 }
 
+static ngx_int_t
+ngx_http_proxy_manager_connection_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_proxy_ctx_t  *ctx;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_manager_module);
+
+    if (ctx == NULL) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+    
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+   
+    if (!r->headers_in.connection && r->headers_in.upgrade && ngx_strcasestrn(r->headers_in.upgrade->value.data, "ebsocket", 8 - 1)) {
+        v->data = ngx_pnalloc(r->pool, 7);
+        if (v->data) {
+            ngx_memcpy (v->data, "upgrade", 7);
+            v->len = 7;
+        }
+    } else if (r->headers_in.connection) {
+        v->data = r->headers_in.connection->value.data;
+        v->len = r->headers_in.connection->value.len;
+    } else {
+        v->data = ngx_pnalloc(r->pool, 5);
+        if (v->data) {
+            ngx_memcpy (v->data, "close", 5);
+            v->len = 5;
+        }
+    }
+    
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_proxy_manager_upgrade_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_proxy_ctx_t  *ctx;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_manager_module);
+
+    if (ctx == NULL) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+    
+    if (r->headers_in.upgrade && ngx_strcasestrn(r->headers_in.upgrade->value.data, "ebsocket", 8 - 1)) {
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        v->data = r->headers_in.upgrade->value.data;
+        v->len = r->headers_in.upgrade->value.len;
+    } else
+        v->not_found = 1;
+    
+    return NGX_OK;
+}
+
 static ngx_http_variable_t  ngx_http_proxy_vars[] = {
 
     { ngx_string("proxy_manager_host"), NULL, ngx_http_proxy_manager_host_variable, 0,
@@ -266,6 +328,12 @@ static ngx_http_variable_t  ngx_http_proxy_vars[] = {
       ngx_http_proxy_manager_internal_body_length_variable, 0,
       NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
 
+    { ngx_string("proxy_manager_connection"), NULL, ngx_http_proxy_manager_connection_variable, 0,
+      NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
+        
+    { ngx_string("proxy_manager_upgrade"), NULL, ngx_http_proxy_manager_upgrade_variable, 0,
+      NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
+      
     { ngx_null_string, NULL, NULL, 0, 0, 0 }
 };
 
@@ -1017,7 +1085,7 @@ char *ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *p
 #endif
 
     ngx_conf_merge_uint_value(conf->http_version, prev->http_version,
-                              NGX_HTTP_VERSION_11);
+                              NGX_HTTP_VERSION_10);
 
     ngx_conf_merge_uint_value(conf->headers_hash_max_size,
                               prev->headers_hash_max_size, 512);
