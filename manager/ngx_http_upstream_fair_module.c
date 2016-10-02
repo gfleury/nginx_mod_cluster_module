@@ -28,11 +28,12 @@ static char *ngx_http_upstream_fair_set_shm_size(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_http_upstream_fair_init_module(ngx_cycle_t *cycle);
 
+#if (NGX_HTTP_SSL)
 static ngx_int_t ngx_http_upstream_fair_set_session(ngx_peer_connection_t *pc,
     void *data);
 static void ngx_http_upstream_fair_save_session(ngx_peer_connection_t *pc,
     void *data);
-
+#endif
 static ngx_command_t  ngx_http_upstream_fair_commands[] = {
 
     { ngx_string("fair"),
