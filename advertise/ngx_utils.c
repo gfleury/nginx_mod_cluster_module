@@ -34,6 +34,7 @@
 #ifndef INADDRSZ
 #define INADDRSZ    4
 #endif
+#if NGX_HAVE_INET6
 static int
 inet_pton4(const unsigned char *src, unsigned char *dst)
 {
@@ -73,7 +74,6 @@ inet_pton4(const unsigned char *src, unsigned char *dst)
     return (1);
 }
 
-#if NGX_HAVE_INET6
 /* int
  * inet_pton6(src, dst)
  *	convert presentation level address to network order binary form.
