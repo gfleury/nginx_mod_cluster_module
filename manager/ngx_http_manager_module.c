@@ -3000,6 +3000,7 @@ static void check_nodes() {
     }
 }
 
+static ngx_event_t clean_timer;
 static void ngx_clean_timer_handler(ngx_event_t *ev) {    
     //mod_manager_config *mconf = ev->data;
     
@@ -3016,7 +3017,7 @@ static void ngx_clean_timer_handler(ngx_event_t *ev) {
     if (ngx_exiting) {
         return;
     }
-    ngx_add_timer(ev, 10000);
+    ngx_add_timer(&clean_timer, 10000);
 }
 
 /*
@@ -3140,7 +3141,6 @@ static ngx_int_t ngx_http_manager_module_init(ngx_cycle_t *cycle) {
 /*
  * Create the mutex of the insert/remove logic
  */
-static ngx_event_t clean_timer;
 static ngx_int_t ngx_http_manager_child_init(ngx_cycle_t *cycle) {
     mod_manager_config *mconf = NULL;
 
