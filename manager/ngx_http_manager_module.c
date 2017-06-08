@@ -3003,7 +3003,7 @@ static void check_nodes() {
 static ngx_event_t clean_timer;
 static void ngx_clean_timer_handler(ngx_event_t *ev) {    
     //mod_manager_config *mconf = ev->data;
-    
+    ngx_log_error(NGX_LOG_DEBUG, ev->log, 0, "Event fired!");
     check_nodes();
     
     /* removed nodes: check for workers */
@@ -3017,6 +3017,8 @@ static void ngx_clean_timer_handler(ngx_event_t *ev) {
     if (ngx_exiting) {
         return;
     }
+    clean_timer.log = ev->log;
+    clean_timer.handler = ngx_clean_timer_handler;
     ngx_add_timer(&clean_timer, 10000);
 }
 
