@@ -3140,6 +3140,7 @@ static ngx_int_t ngx_http_manager_module_init(ngx_cycle_t *cycle) {
 /*
  * Create the mutex of the insert/remove logic
  */
+static ngx_event_t clean_timer;
 static ngx_int_t ngx_http_manager_child_init(ngx_cycle_t *cycle) {
     mod_manager_config *mconf = NULL;
 
@@ -3149,10 +3150,10 @@ static ngx_int_t ngx_http_manager_child_init(ngx_cycle_t *cycle) {
     }
 
     if (mconf) {
-        mconf->clean_timer->log = ngx_cycle->log;
-        mconf->clean_timer->handler = ngx_clean_timer_handler;
-        mconf->clean_timer->data = mconf;
-        ngx_add_timer(mconf->clean_timer, (ngx_msec_t) 10000);
+        clean_timer.log = ngx_cycle->log;
+        clean_timer.handler = ngx_clean_timer_handler;
+        clean_timer.data = mconf;
+        ngx_add_timer(&clean_timer, (ngx_msec_t) 10000);
     }
     return sharedmem_initialize_child(cycle->pool);
 }
