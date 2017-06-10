@@ -3019,7 +3019,7 @@ static void ngx_clean_timer_handler(ngx_event_t *ev) {
     }
     clean_timer.log = ev->log;
     clean_timer.handler = ngx_clean_timer_handler;
-    ngx_add_timer(&clean_timer, 10000);
+    ngx_add_timer(&clean_timer, 5000);
 }
 
 /*

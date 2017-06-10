@@ -13,11 +13,11 @@
 #define DEFMAXCONTEXT   200
 #define DEFMAXNODE      300
 #define DEFMAXHOST      300
-#define DEFMAXSESSIONID 300 /* it has performance/security impact */
+#define DEFMAXSESSIONID 600 /* it has performance/security impact */
 #define DEFMAXJGROUPSID  300
 #define MAXMESSSIZE     1024
 
-#define TIMESESSIONID   300
+#define TIMESESSIONID   60
 #define TIMEDOMAIN    300                    /* after 5 minutes the sessionid have probably timeout */
 
 /* Error messages */
